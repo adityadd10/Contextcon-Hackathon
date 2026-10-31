@@ -1,0 +1,6 @@
+node_modules/
+out/
+public/clips/
+public/vo/
+public/manifest.json
+public/music.wav
