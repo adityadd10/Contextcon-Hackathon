@@ -30,3 +30,6 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
   0.33/result, matching the pricing table (0.03 + 0.1 experience + 0.1 education + filters).
 - 11:45 · Aditya · parser gaps found by end-to-end tests ("head of data" → "head", name-only requests, lowercase company)
   → handed to Vaibhav in docs/UPDATES.md.
+- 11:58 · Aditya · OpenRouter: the default free model names were stale (llama-3.3/deepseek gone). Listed /models and tested 3:
+  Nemotron 3 Ultra works (3.7 s, correct JSON), Gemma 4 31B upstream 429, Inkling 403 (blocked for API use). Free tier = 50 req/day
+  per key → LLM use must be capped and cached; rules stay the backbone.

@@ -6,6 +6,36 @@ Aditya's Claude Code appends an entry each improvement loop (about every 25 min 
 
 ---
 
+## 11:58 · OpenRouter verified (free LLM is live)
+
+**Findings:**
+- The free key works, but **free tier = 50 LLM requests per day per key**. Every member must create their **own** key at
+  openrouter.ai → Keys and put it in their own `.env` (never commit it, and never paste it in the repo or chat).
+- The old default models in `llm.py` no longer exist. Tested working chain (now in `.env.example`):
+  `nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-31b-it:free,nvidia/nemotron-3.5-lightning:free,google/gemma-4-26b-a4b-it:free`
+  - `nvidia/nemotron-3-ultra-550b-a55b:free` parsed *"yo can u get me to teh data guy at swiggy, ideally thru iitb ppl,
+    we're hiring"* correctly in 3.7 s → company Swiggy, role "head of data", schools [IIT Bombay], purpose hiring.
+  - `google/gemma-4-31b-it:free` returns 429 when upstream is busy (fine as a fallback). `thinkingmachines/inkling:free` returns 403
+    (blocked for API use, don't use it).
+
+### Vaibhav (Member B): do these (llm.py and parse.py are yours)
+1. `llm.py`: replace the default `MODELS` list with the chain above. Treat 429 as "try the next model", and 403 as "skip the
+   model for the rest of the process".
+2. `llm.py`: add a **per-process LLM call cap** (env `LLM_MAX_CALLS`, default 6) plus an in-memory cache keyed by
+   (system, user). With 50 calls a day, a demo run should use at most 1 parse call + up to 3 draft-polish calls.
+3. `parse.py` bug seen live: the LLM put the **target** company into `companies` (the network filter) → `companies:
+   ['Swiggy']`. Drop any network company equal to the target company, otherwise every Swiggy employee counts as "in network".
+   Add a test.
+4. Keep the rule-based parse as the base and only let the LLM fill fields the rules missed or got obviously wrong (it beat the
+   rules on "teh data guy" → "head of data").
+
+### Apurba (Member C)
+- In the UI's step list, show `parser=llm` vs `parser=rules` from the parse step detail. It's a nice robustness talking point
+  ("works even when the free LLM is rate-limited").
+- Create your own OpenRouter key for UI testing, but prefer `WARMPATH_FAKE=1` without an LLM key while iterating, to save the 50/day.
+
+---
+
 ## 11:45 · Loop 1: robustness of resolution
 
 **Changed (Aditya's files):**
