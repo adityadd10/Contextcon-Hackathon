@@ -70,3 +70,30 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
   markup (`[bold]`) are handled, with exit codes 0/1/2/130.
 - 12:19 · Apurba · for Aditya: `pipeline.run` returns before emitting `done` when the target can't be resolved (the `return`
   inside `try` skips the final emit). The UI now handles a clean end with no `done`, but CLI/MCP callers get no `done` event.
+- 11:32 · B · rule parser v1 was case-sensitive on the company ("at Swiggy" ok, "at swiggy" missed) and read "intro"
+  as the preposition "in" + "tro" → rewrote it: text-speak normaliser (teh/da/2/sum1/pls), company URL and domain
+  detection, "<role> of <Co>" only when there's no "at", "<Co>'s <role>", "<Name> (<Co>)", Hinglish
+  "<co> mein <role> se intro", network hints ("via ex-Microsoft folks"). 16-case messy suite, all green.
+- 11:32 · B · LLM parse could return a person the user never named → its person/company are kept only if they
+  fuzzy-match the request text (lets it fix "swigy" → "Swiggy", blocks invented names). Rules stay the fallback.
+- 11:34 · B · hardest case, measured on a hand-made scenario (target: 2y at a 30-person startup, then Google 180k):
+  v1 scores were small-team pair 67.3, Google same-team 67.0, Google same-function-only 62, Google total stranger 52.
+  "Both at Google" was worth almost as much as two years on a tiny team. Tuning the size points alone can't fix
+  it: size is worth at most 25 of 100, while overlap months give up to 40 to anyone at any company. → explicit, explainable `big_company_discount` factor: at >1k people we
+  keep 80% / 55% / 35% of the overlap points, and give 35% back if there's a team signal (same function, similar
+  title, same location). Now: small team 72.3 > Google same team 54 > same function only 46 > stranger 26.
+  "Joined within two months" only counts at ≤1k people (thousands join Google every month).
+- 11:34 · B · a past stint with no end date was treated as "still there", inventing years of overlap → cap at 1 year
+  and say so in the factor text. End-before-start records produce no claim at all.
+- 11:34 · B · paths bug: `c.person_id == target.person_id` is True when both are None, so every id-less connector was
+  dropped. Identity is now Crustdata id, else profile URL, never name (same-name people are common).
+- 11:36 · B · claim checker v1 only checked years → now checks years, numbers/%, durations and every capitalised word
+  against the path's evidence vocabulary (names, employers, titles, schools, factor text). The template itself is
+  checked too (it had "15 minutes", which the checker rightly flagged → reworded). LLM drafts with any unsupported
+  sentence are dropped and kept in `Draft.llm_rejected` for the UI. Outbox files list every source record.
+- 11:36 · B · web proof counted LinkedIn "people also viewed" sidebars as co-mentions → skip profile/directory hosts
+  and require full names close together; label hits co-founded / co-authored / spoke together.
+- 11:36 · B · free LLM down = 4 models × 40s timeout per call, per draft → 20s timeout, 45s overall deadline, 2-min
+  cooldown after a total failure, `WARMPATH_LLM=0` kill switch for the "works with the LLM off" demo.
+- 11:38 · B · eval harness: co-founder recovery. Ties are broken against us; random baseline computed exactly;
+  ablation without the title factor because both co-founders often have "Co-founder" titles (would flatter us).

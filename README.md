@@ -124,19 +124,61 @@ _What worked, what didn't, and why we chose the one we built._ (Full log: [NOTES
 - **Shortest vs. strongest path:** the shortest path often runs through a weak "both at a 30k-person company" tie, so we use Dijkstra on `-ln(score)` instead, which makes a chain of strong ties beat a short weak one. ✓
 - **What failed:** the school filter `"IIT Bombay"` missed profiles that say "Indian Institute of Technology Bombay", so we added alias expansion. Searching the raw company string "Swigy Pvt Ltd company" failed, but searching the cleaned name works. The budget guard over-estimated search cost and blocked valid searches, so we fixed the estimate.
 
-TODO (Vaibhav): parser / scoring / draft approaches from NOTES.md.
+**How we decide two people know each other.**
+- *Tried:* "shared employer" (what most tools do). *Failed:* two people who both worked at Google are almost always
+  strangers. Our first scorer gave a Google stranger 52/100 and a Google teammate 67.0, almost the same as two years
+  on a 30-person team (67.3).
+- *Built:* an explainable tie score (0–100). Every factor is a line you can read and click: months of overlap on the
+  same `crustdata_company_id`, company size, same function, similar title, same location, joined together, recency,
+  repeat colleagues, classmates, web co-mentions. At companies over 1,000 people a visible `big_company_discount` cuts
+  the overlap points unless there's a team signal. Result: small team 72 > Google teammate 54 > Google stranger 26.
+- *Paths:* `0.7 × weakest tie + 0.3 × mean`, × 0.85 per extra hop. A chain is only as warm as its weakest link.
+
+**Understanding the request.** Rules alone missed vague phrasing ("the data guy" is really "head of data"), and the
+free LLM made real mistakes live: it put the target company into the network filter, which would make every
+Swiggy employee "in network". Free models also have 50 requests a day and go down. We run both: rules always (text-speak, URLs, domains, "CTO of X", "X's head of data", "swiggy
+mein data head se intro"), and the free LLM only fills gaps. It may not name anyone or any company that isn't in the
+request. If the LLM is down, slow or switched off (`WARMPATH_LLM=0`), the rules carry the run.
+
+**Drafts with no made-up facts.** We don't let a free LLM add facts to a message that goes to a real person. The draft starts as a template filled only from evidence. An LLM rewrite is kept only if
+`check_claims` finds every year, number and proper noun in the path's Crustdata records. Otherwise the rewrite is
+dropped and logged (our tests feed it invented claims, such as a fake shared team at Google, and check they're caught). Every outbox file ends with its sources (record refs and profile URLs).
+
+**Web proof.** Plain name co-occurrence is easy to fool: a LinkedIn "people also viewed" sidebar puts strangers side by side. We skip
+profile and contact-directory sites and require both full names, then label each hit (co-founded, co-authored,
+spoke together).
 
 ### The hardest case
 Same-name people and huge companies, where "both at Google" means nothing. Two people named "Priya Sharma" are
-disambiguated by company + title match, with a warning when it's still ambiguous. Big-company ties are discounted by
-company size at the time (25 points at ≤50 people, down to 2 above 10k), and same-function overlap raises them.
+disambiguated by company + title match, with a warning when it's still ambiguous. Big-company ties get a visible
+`big_company_discount` (company size from the latest headcount: 25 points at ≤50 people, down to 2 above 10k, and
+only part of the overlap points kept above 1,000 people), which a same-team signal (function, title, location) partly
+restores.
 
 ## Testing
-- `uv run --with pytest pytest -q tests`: unit + offline end-to-end tests against the fake Crustdata world. They cover
-  overlap and scoring, graph derivation, the crawler, budget exhaustion, 429 retries, typos and redacted profiles.
-- **Co-founder recovery eval** (`eval/cofounder_eval.py`): for real startups, take the founders from
-  `/company/enrich`, then check whether the real co-founder is WarmPath's #1 connector. TODO (Vaibhav): top-1 / top-3
-  accuracy vs. a random-colleague baseline.
+```bash
+uv run --with pytest pytest -q tests          # 45 tests, no network, no API keys needed
+uv run python -m eval.cofounder_eval          # live co-founder eval (~4-6 credits per startup)
+uv run python -m eval.cofounder_eval --offline   # re-score saved data, 0 credits
+```
+- **Messy-input suite** ([tests/test_parse.py](tests/test_parse.py)): 16 real-world requests, including typos ("teh data
+  guy at swiggy pls"), text-speak, Hinglish, profile/company URLs, domains, all-caps, a name with no company, and
+  network hints. Plus: the LLM can't invent a name, and LLM-down falls back to rules.
+- **Tie model** ([tests/test_score.py](tests/test_score.py)): the hardest case (small team beats a big-company
+  teammate beats a big-company stranger), Evidence on every factor, missing and impossible dates, same-company matching
+  without IDs, id-less dedupe, weakest-link path scoring.
+- **Drafts** ([tests/test_draft.py](tests/test_draft.py)): the template passes its own fact check. Five kinds of
+  invented claims are caught (wrong company, year, number, person, school). A hallucinating LLM draft is rejected.
+- **Web proof, LLM client:** directory pages ignored, API failures handled, LLM cooldown after an outage.
+- **Graph and pipeline (offline end-to-end, fake Crustdata world):** graph derivation, the crawler, budget
+  exhaustion, 429 retries, typos and redacted profiles.
+- **Co-founder recovery eval** ([eval/cofounder_eval.py](eval/cofounder_eval.py)): for ~15 Indian startups, take the
+  founders from `/company/enrich` (`people.founders`). Make each founder the target, and rank their co-founders plus up
+  to 25 colleagues from `/person/search` by tie score. Is a real co-founder WarmPath's #1 connector? Compared with a
+  random colleague (exact expectation), "longest overlap only", and WarmPath without the title factor (co-founders
+  often share a "Co-founder" title, which would flatter us). Equal scores count against us.
+
+  _Results: TODO, paste the table from `eval/results.md` after the live run._
 
 ---
 Team docs: [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) (work split, deliverables, judging) · [docs/PLAN.md](docs/PLAN.md) (technical spec)
