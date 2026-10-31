@@ -118,8 +118,18 @@ def _verify(d: Draft, path: IntroPath) -> None:
     d.claims_unsupported = check_claims(d.body, path) + check_claims(d.forwardable_blurb, path)
 
 
+VERIFIED_FOOTER = "(verified via Crustdata)"
+
+
 async def draft_intro(path: IntroPath, spec: TargetSpec) -> Draft:
+    """Template draft; LLM polish only when every tie on the path was re-verified against full profiles."""
     d = template(path, spec)
+    unverified = [t for t in path.ties if not t.verified]
+    if unverified:
+        d.claims_unsupported += [f"Link {t.a.name} → {t.b.name} not re-verified against full Crustdata profiles"
+                                 + (f" ({t.verification})" if t.verification else "") for t in unverified]
+        return d
+    d.forwardable_blurb += f" {VERIFIED_FOOTER}"
     if llm.available():
         facts = "\n".join(f"- {x}" for x in _facts(path))
         txt = await llm.complete(

@@ -148,3 +148,13 @@ def test_title_changes_at_one_company_are_one_tenure():
     assert len(ov) == 1 and ov[0].start == date(2014, 12, 1) and ov[0].end >= date.today()
     assert (ov[0].a_stint_ref, ov[0].b_stint_ref) == ("a1", "t1")
     assert "recent" in next(f for f in score_tie(a, t).factors if f.name == "recency").explanation
+
+
+def test_same_team_from_titles_when_function_is_missing():
+    """Live data: function_category is usually empty, so the team named in the titles is the team signal."""
+    t = P(1, "Target T", S(20, "Swiggy", (2020, 1, 1), hc=29000, title="Head of Data"))
+    a = P(2, "Alice A", S(20, "Swiggy", (2020, 6, 1), hc=29000, title="Senior Data Scientist"))
+    b = P(3, "Bob B", S(20, "Swiggy", (2020, 6, 1), hc=29000, title="Category Manager"))
+    ta, tb = score_tie(a, t), score_tie(b, t)
+    assert any(f.name == "same_team" and f.value == "data" and f.evidence for f in ta.factors)
+    assert ta.score > tb.score + 15

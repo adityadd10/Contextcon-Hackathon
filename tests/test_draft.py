@@ -22,7 +22,10 @@ def _path(with_seed=False):
     seeds = [Person(name="Vaibhav N", person_id=3, source_endpoint="/person/enrich",
                     stints=[Stint("Acme", 30, "Engineer", date(2020, 3, 1), None, True, company_headcount=60,
                                   ref="person:3#experience.current[0]")])] if with_seed else []
-    return build_paths(t, [c], seeds, TargetSpec(raw="x", purpose="sales"))[0]
+    path = build_paths(t, [c], seeds, TargetSpec(raw="x", purpose="sales"))[0]
+    for tie in path.ties:
+        tie.verified = True
+    return path
 
 
 def test_template_is_fully_supported_and_cited():
@@ -72,3 +75,21 @@ def test_outbox_file_lists_sources(tmp_path, monkeypatch):
     f = write_outbox(template(_path(), TargetSpec(raw="x")), "run1")
     text = f.read_text(encoding="utf-8")
     assert "NOT SENT" in text and "person:1#experience.past[0]" in text and "every sentence checked" in text
+
+
+def test_unverified_path_is_flagged_and_never_llm_polished(monkeypatch):
+    async def never(*_a, **_k):
+        raise AssertionError("LLM must not polish an unverified path")
+    monkeypatch.setattr(llm, "available", lambda: True)
+    monkeypatch.setattr(llm, "complete", never)
+    p = _path()
+    p.ties[0].verified = False
+    d = asyncio.run(draft_intro(p, TargetSpec(raw="x")))
+    assert d.claims_unsupported and "not re-verified" in d.claims_unsupported[0]
+    assert "verified via Crustdata" not in d.forwardable_blurb
+
+
+def test_verified_path_gets_footer(monkeypatch):
+    monkeypatch.setattr(llm, "available", lambda: False)
+    d = asyncio.run(draft_intro(_path(), TargetSpec(raw="x")))
+    assert d.forwardable_blurb.endswith("(verified via Crustdata)") and not d.claims_unsupported

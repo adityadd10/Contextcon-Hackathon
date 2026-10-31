@@ -177,6 +177,11 @@ def score_tie(a: Person, b: Person) -> Tie:
                 fpts = 10.0 if (hc or 0) <= 1000 else 6.0
                 factors.append(Factor("same_function", sa.function, fpts, f"Both in {sa.function}", ev))
                 team.append("same function")
+            elif not (sa.function and sb.function) and (kw := _team(sa.title)) and kw == _team(sb.title):
+                # function_category is usually empty on live data: fall back to the team named in both titles
+                factors.append(Factor("same_team", kw, 8.0 if (hc or 0) <= 1000 else 5.0,
+                                      f"Both titles name the {kw} team", ev))
+                team.append(f"{kw} team")
             if sa.title and sb.title and fuzz.token_set_ratio(sa.title.lower(), sb.title.lower()) >= 70:
                 factors.append(Factor("similar_title", f"{sa.title} / {sb.title}", 7.0 if not team else 3.0,
                                       "Similar roles, likely the same team", ev))
@@ -226,6 +231,11 @@ def score_tie(a: Person, b: Person) -> Tie:
     score = tie_score(factors)
     kind = "colleague" if overlaps else ("classmate" if any(f.name == "classmates" for f in factors) else "colleague")
     return Tie(a=a, b=b, score=score, factors=factors, overlaps=overlaps, kind=kind)
+
+
+def _team(title: str | None) -> str | None:
+    from .discover import team_keyword
+    return team_keyword(title)
 
 
 def _same_school(a: str, b: str) -> bool:

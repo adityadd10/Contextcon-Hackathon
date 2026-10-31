@@ -123,3 +123,9 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
 - 12:55 · B · known weakness (next step): company size uses the *latest* headcount, so founders who worked
   together at a 10-person Razorpay get a big-company discount today. `/company/enrich` has a headcount time series;
   using the headcount during the overlap is the fix. Not done now, because it adds a call per company per tie.
+- 13:10 · B · UPDATES 12:08/12:15: `function_category` is usually empty live → `same_team` factor when both titles
+  name the same team (`discover.team_keyword`), which also counts as a team signal for the big-company discount.
+  Drafts: LLM polish only when every tie is `verified`; verified blurbs end "(verified via Crustdata)"; unverified
+  links are listed in `claims_unsupported`. Eval re-scored offline: unchanged (91% / 94%).
+- 13:10 · B · "teh data guy at swiggy pls" finds no target on origin/main because the parser fix wasn't pushed yet
+  (no repo access for Vaibhav2402). Locally it runs end to end in the fake world: Priya Sharma, 2 verified paths, 2 drafts.
