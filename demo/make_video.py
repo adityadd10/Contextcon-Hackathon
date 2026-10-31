@@ -46,15 +46,15 @@ ACCOUNTS = ["head of data at Swiggy", "data engineer at Swiggy", "intro to Priya
 
 # (chapter title or None, narration, action). A new chapter gets a soft fade transition and a chapter label.
 SCENES = [
-    (None, "Every great opportunity starts with an introduction. Yet today, people pay brokers and recruiters just to find one.", "title"),
-    ("Ask in plain words", "With WarmPath, you simply ask. Say, a warm intro to whoever runs data at Swiggy, through IIT Bombay people.", "ask"),
-    (None, "It finds the real person on Crustdata, and then the people who actually worked beside them, at the same company, at the same time.", "stream"),
-    ("A route you can trust", "The answer comes first. The best route starts with someone from our own team, and every hop is scored and re-verified.", "answer"),
-    ("Every claim is cited", "Open a route, and every reason is backed by a record. One click shows the exact API call behind it.", "evidence"),
-    ("A human approves", "Then WarmPath drafts a polite intro. It never sends anything. You review it, edit it, and approve it.", "inbox"),
-    ("Built for teams", "Even messy requests just work. And sales or hiring teams can map a whole list of accounts at once.", "teams"),
-    ("A network that grows", "Every search grows a verified network. In our tests, WarmPath found the real co-founder as the top connector, ninety-one percent of the time.", "network"),
-    (None, "WarmPath. Warm intros, with every link verified.", "end"),
+    (None, "Cold messages get ignored. Warm introductions get answered. But finding who can introduce you takes hours, or a paid broker.", "title"),
+    ("Just ask", "WarmPath does it in seconds. Just say who you want to meet.", "ask"),
+    (None, "It finds the people who truly worked with them: same company, same time.", "stream"),
+    ("Your best route", "You get the best route, through people you already know, with a strength score for every hop.", "answer"),
+    ("Proof, not guesses", "Every reason is backed by a Crustdata record. One click shows the exact source.", "evidence"),
+    ("The intro, written", "Then it writes the intro request for you. You just approve. Nothing is sent without you.", "inbox"),
+    ("A whole list at once", "Founders, recruiters and sales teams can plan a whole list of targets at once.", "teams"),
+    ("Proven", "In testing, it picked the real co-founder as the top connector ninety-one percent of the time.", "network"),
+    (None, "WarmPath. The warm intro, done for you.", "end"),
 ]
 CAPTION_FIXES = {"ninety-one percent": "91%"}
 
@@ -112,12 +112,20 @@ iframe{width:__AW__px;height:__AH__px;border:0;transform:scale(__S__);transform-
   <svg width="120" height="120" viewBox="0 0 22 22" fill="none"><circle cx="4" cy="16" r="2.4" fill="#1A1918"/><circle class="b" cx="18" cy="6" r="2.4" fill="#C2410C"/>
     <path d="M5.8 14.3C9 13 9.5 8.8 16.2 7.4" stroke="#1A1918" stroke-width="1.1" stroke-linecap="round"/></svg>
   <h1 class="rise" style="animation-delay:.5s">WarmPath</h1>
-  <p class="rise" style="animation-delay:.9s">Warm intros to anyone. Every link verified.</p>
+  <p class="rise" style="animation-delay:.9s">The warm intro, done for you.</p>
+</div>
+<div class="card out" id="proof">
+  <div style="display:flex;gap:120px;align-items:flex-end">
+    <div style="text-align:center"><h1 style="font-size:220px;margin:0;color:#1A1918">91%</h1><p style="margin-top:8px">WarmPath</p></div>
+    <div style="text-align:center"><h1 style="font-size:220px;margin:0;color:#C9C4BB">9%</h1><p style="margin-top:8px;color:#8A867F">Random colleague</p></div>
+  </div>
+  <div style="font:400 30px/1.4 Inter;margin-top:40px;color:#4B4844">Real co-founder ranked as the #1 connector</div>
+  <div class="meta">32 founders · 11 startups · live Crustdata data</div>
 </div>
 <div class="card out" id="end">
   <svg width="96" height="96" viewBox="0 0 22 22" fill="none"><circle cx="4" cy="16" r="2.4" fill="#1A1918"/><circle class="b" cx="18" cy="6" r="2.4" fill="#C2410C"/>
     <path d="M5.8 14.3C9 13 9.5 8.8 16.2 7.4" stroke="#1A1918" stroke-width="1.1" stroke-linecap="round"/></svg>
-  <h1>WarmPath</h1><p>Warm intros, with every link verified on Crustdata.</p>
+  <h1>WarmPath</h1><p>The warm intro, done for you. Every link verified on Crustdata.</p>
   <div class="meta">Aditya · Vaibhav · Apurba &nbsp;—&nbsp; ContextCon IIT Bombay &nbsp;—&nbsp; __REPO__</div>
 </div>
 <script>
@@ -265,7 +273,7 @@ class Director:
 
     # -------------------------------------------------- scenes
     async def title(self) -> None:
-        await self.wait(4.2)
+        await self.wait(5.5)
         await self.p.evaluate("stage.card('title', false)")
         await self.p.evaluate("([x, y]) => stage.cursor(x, y, 10)", [AW * .62, AH * .78])
 
@@ -281,9 +289,6 @@ class Director:
         await self.wait(.6)
 
     async def answer(self) -> None:
-        await self.zoom("#summary", 1.3)
-        await self.wait(2.0)
-        await self.reset()
         await self.scroll("#rtabs", 90)
         await self.zoom(".path .row", 1.45, 30)
         await self.point_at(".path .chain .hop", 700)
@@ -291,14 +296,11 @@ class Director:
     async def evidence(self) -> None:
         await self.reset()
         await self.scroll(".path.open .detail", 60)
-        await self.zoom(".path.open .tie", 1.3, 20)
-        await self.wait(1.4)
-        await self.reset()
         if await self.f.locator(".path.open button.cite.call").count():
             await self.click(".path.open button.cite.call")
             await self.wait(1.0)
             await self.zoom("#drawer tr.hl", 1.35, 40)
-            await self.wait(1.6)
+            await self.wait(1.0)
             await self.reset()
             await self.click("#auditClose")
 
@@ -320,11 +322,6 @@ class Director:
             await self.reset()
 
     async def teams(self) -> None:
-        await self.tab("find")
-        await self.type("#q", MESSY_QUERY, delay=60)
-        await self.submit()
-        await self.wait_run()
-        await self.wait(.8)
         await self.tab("accounts")
         await self.type("#batchIn", "\n".join(ACCOUNTS), delay=16)
         await self.click("#batchGo")
@@ -332,16 +329,14 @@ class Director:
         await self.zoom(".tbl", 1.2, 20)
 
     async def network(self) -> None:
-        await self.reset()
-        await self.tab("graph")
-        await self.wait(2.2)
-        await self.click("#pGo")
-        await self.wait(1.0)
-        await self.zoom("#gSummary", 1.25, 30)
+        await self.p.evaluate("stage.card('proof', true)")   # the proof point is shown, not just said
+        await self.p.evaluate("stage.reset()")
 
     async def end(self) -> None:
         await self.reset()
         await self.p.evaluate("stage.card('end', true)")
+        await self.wait(.5)
+        await self.p.evaluate("stage.card('proof', false)")
         await self.wait(1.0)
 
 
@@ -565,7 +560,7 @@ def main() -> None:
         if live:
             log("warming the cache with every demo request…")
             from urllib.parse import quote
-            for q in (MAIN_QUERY, MESSY_QUERY):
+            for q in (MAIN_QUERY,):
                 consume_sse(base + "api/run?q=" + quote(q))
             consume_sse(base + "api/batch?targets=" + quote("\n".join(ACCOUNTS)), timeout=900)
             for rel in ("reports", "outbox", "data/review.json"):
