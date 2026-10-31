@@ -246,3 +246,5 @@ latency. Edge cases found by our adversarial loops are pinned as tests in
 
 ---
 Team docs: [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) (work split, deliverables, judging) · [docs/PLAN.md](docs/PLAN.md) (technical spec)
+
+**Read more:** [docs/EXPLAINER.md](docs/EXPLAINER.md) (the project explained, simple and technical) · [docs/PITCH.md](docs/PITCH.md) (pitch script)
