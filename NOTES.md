@@ -204,3 +204,10 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
   to the first connector (the only person the sender knows), states each hop with its own pair ("you and Rahul
   overlapped at Beta, then Rahul and Priya overlapped at TinyCo"), and asks them to pass the note one hop on; the
   forwardable blurb names the last connector, who hands it to the target. 2- and 3-node drafts unchanged. Tests added.
+- 13:23 · Apurba · demo video is now reproducible: `demo/make_video.py` drives the real UI in a recorded browser, voices each
+  scene with macOS `say` and muxes an MP4 with captions and an end card (about 1:33). Each scene lasts as long as its narration,
+  so voice and screen never drift. It runs on its own server in a throwaway workspace, so reports/inbox are never touched.
+  Live mode warms the cache first, so no scene waits on rate limits.
+- 13:23 · Apurba · hit the 14:45 cache-poisoning bug on my machine: 13 of 44 `.cache/crust` files held the fake company 1001, from
+  a WARMPATH_FAKE=1 server that ran in the repo before Loop 7. Quarantined .cache/, data/, reports/ and outbox/ (moved, not
+  deleted). The video script now refuses to record live while the cache holds fake ids.
