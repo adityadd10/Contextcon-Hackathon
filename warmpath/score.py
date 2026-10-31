@@ -157,7 +157,7 @@ def _pair_ev(a: Person, b: Person, o: Overlap) -> list[Evidence]:
 
 
 def score_tie(a: Person, b: Person) -> Tie:
-    if a.person_id is not None and a.person_id == b.person_id:
+    if a is b or (a.person_id is not None and a.person_id == b.person_id):
         return Tie(a=a, b=b, score=0.0, kind="self")
     overlaps = find_overlaps(a, b)
     factors: list[Factor] = []
@@ -172,7 +172,8 @@ def score_tie(a: Person, b: Person) -> Tie:
         factors.append(Factor("overlap_months", main.months, round(overlap_pts, 1),
                               f"Overlapped {main.months:.0f} months at {main.company_name} ({window}){note}", ev))
 
-        hc = (sa.company_headcount if sa else None) or (sb.company_headcount if sb else None)
+        hc = next((h for h in (sa.company_headcount if sa else None, sb.company_headcount if sb else None)
+                   if isinstance(h, (int, float)) and h > 0), None)       # 0 / negative = unknown, not "tiny"
         basis, size_ev = "", ev[:1]
         if hist := headcount.size_during(main.company_id, main.start, main.end):   # size *during* the overlap
             hc, basis = hist[0], hist[1]
@@ -256,6 +257,8 @@ def _team(title: str | None) -> str | None:
 
 
 def _same_school(a: str, b: str) -> bool:
+    if not (a or "").strip(" ?") or not (b or "").strip(" ?"):
+        return False                                    # unnamed schools prove nothing
     from .discover import school_variants
     va = {v.lower().replace(",", "") for v in school_variants(a)}
     vb = {v.lower().replace(",", "") for v in school_variants(b)}

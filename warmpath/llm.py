@@ -91,12 +91,14 @@ async def complete(system: str, user: str, *, temperature: float = 0.2, max_toke
 async def complete_json(system: str, user: str, **kw) -> dict | None:
     """Ask for JSON; tolerate ```json fences and leading prose. None on failure."""
     text = await complete(system + "\nRespond with ONLY a JSON object, no prose.", user, **kw)
-    if not text:
+    if not isinstance(text, str):
         return None
-    m = re.search(r"\{.*\}", text, re.S)
-    if not m:
-        return None
-    try:
-        return json.loads(m.group(0))
-    except json.JSONDecodeError:
-        return None
+    dec = json.JSONDecoder()
+    for m in re.finditer(r"\{", text):            # first position that decodes as a JSON object wins
+        try:
+            obj, _ = dec.raw_decode(text, m.start())
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            return obj
+    return None

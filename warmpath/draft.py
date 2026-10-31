@@ -89,18 +89,26 @@ def _shared(t: Tie, you: bool = True) -> str:
     return f"{who} crossed paths"
 
 
+def _full(p: Person) -> str:
+    return p.name if p.name and p.name.strip() not in ("", "?") else "this person"
+
+
 def _first(p: Person) -> str:
-    return p.name.split()[0] if p.name and p.name != "?" else "there"
+    return p.name.split()[0] if p.name and p.name.strip() not in ("", "?") else "there"
 
 
 def template(path: IntroPath, spec: TargetSpec) -> Draft:
+    if len(path.nodes) < 2 or not path.ties:
+        name = _full(path.nodes[-1]) if path.nodes else "the target"
+        return Draft(path_rank=path.rank, to="(nobody)", subject=f"Intro to {name}?", body="", forwardable_blurb="",
+                     claims_unsupported=["No connector on this path, so there is no one to ask for an intro"])
     target, connector = path.nodes[-1], path.nodes[-2]
     role = target.current_title or "their current role"
     sender = path.nodes[0] if len(path.nodes) >= 3 else None
     opener = (f"We overlapped at {path.ties[0].overlaps[0].company_name}, so I hope this isn't too out of the blue. "
               if sender and path.ties[0].overlaps else "")
     body = (f"Hi {_first(connector)},\n\n{opener}"
-            f"I'm hoping to reach {target.name} ({role}) {ASK[spec.purpose]}. "
+            f"I'm hoping to reach {_full(target)} ({role}) {ASK[spec.purpose]}. "
             f"I noticed {_shared(path.ties[-1])}, so you might be the right person to ask.\n\n"
             f"Would you be open to forwarding the short note below? Totally fine if not.\n\nThanks!\n"
             f"{'[' + sender.name + ']' if sender else '[Your name]'}")
@@ -124,6 +132,8 @@ VERIFIED_FOOTER = "(verified via Crustdata)"
 async def draft_intro(path: IntroPath, spec: TargetSpec) -> Draft:
     """Template draft; LLM polish only when every tie on the path was re-verified against full profiles."""
     d = template(path, spec)
+    if not path.ties or len(path.nodes) < 2:
+        return d
     unverified = [t for t in path.ties if not t.verified]
     if unverified:
         d.claims_unsupported += [f"Link {t.a.name} → {t.b.name} not re-verified against full Crustdata profiles"

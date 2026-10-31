@@ -29,15 +29,17 @@ async def web_cooccurrence(c: Crust, a: Person, b: Person) -> Factor | None:
         return None
     hits = []
     for r in (res.get("results") if isinstance(res, dict) else None) or []:
+        if not isinstance(r, dict):
+            continue
         url = r.get("url") or ""
         if not url or SKIP_HOSTS.search(url):
             continue
-        text = f"{r.get('title', '')} {r.get('snippet', '')}"
+        text = f"{r.get('title') or ''} {r.get('snippet') or ''}"
         if mentions(text, a.name) and mentions(text, b.name):
             hits.append((r, _kind(f"{url} {text}")))
     if not hits:
         return None
-    ev = [Evidence(claim=f"Web page mentions both ({kind}): {h.get('title', '')[:90]}", kind="web",
+    ev = [Evidence(claim=f"Web page mentions both ({kind}): {(h.get('title') or h.get('url') or '')[:90]}", kind="web",
                    endpoint="/web/search/live", ref=f"web:{h.get('url')}", url=h.get("url"), call_id=c.last_call_id)
           for h, kind in hits[:3]]
     kinds = sorted({k for _, k in hits})

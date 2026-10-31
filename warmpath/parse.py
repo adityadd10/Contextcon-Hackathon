@@ -16,6 +16,11 @@ from .models import NetworkSpec, TargetSpec
 
 PROFILE_RE = re.compile(r"https?://(?:[a-z]{2,3}\.)?linkedin\.com/in/[\w\-%]+/?", re.I)
 COMPANY_URL_RE = re.compile(r"https?://(?:[a-z]{2,3}\.)?linkedin\.com/company/[\w\-%]+/?", re.I)
+WEB_URL_RE = re.compile(r"https?://(?:www\.)?([a-z0-9\-]+(?:\.[a-z0-9\-]+)+)(?:/\S*)?", re.I)
+MAX_INPUT = 2000
+PREPS = {"at", "of", "in", "from", "@", "to", "via", "for"}
+NAME_WORD_RE = re.compile(r"[^\W\d_]+(?:['\-.][^\W\d_]*)*\.?")
+HONORIFIC_RE = re.compile(r"^(?:dr|mr|mrs|ms|prof|shri|smt)\.?\s+", re.I)
 DOMAIN_RE = re.compile(r"\b([a-z0-9\-]+\.(?:com|io|ai|in|co|org|net|app|dev|tech))\b", re.I)
 SCHOOL_ALIASES = {
     "iitb": "IIT Bombay", "iit bombay": "IIT Bombay", "iit-b": "IIT Bombay", "iit b": "IIT Bombay",
@@ -115,7 +120,7 @@ def _not_target(companies: list[str], target: str | None) -> list[str]:
 
 def parse_rules(text: str) -> TargetSpec:
     spec = TargetSpec(raw=text, network=NetworkSpec())
-    t = " ".join(text.split())
+    t = " ".join(text[:MAX_INPUT].split())          # a pasted essay shouldn't become a 20k-char company name
     urls = PROFILE_RE.findall(t)
     if urls:
         spec.profile_url = urls[0]
@@ -124,6 +129,7 @@ def parse_rules(text: str) -> TargetSpec:
     if m := COMPANY_URL_RE.search(t):
         spec.company = m.group(0)
     t = COMPANY_URL_RE.sub(" ", t)
+    t = WEB_URL_RE.sub(lambda m: m.group(1), t)     # "https://swiggy.com/careers" -> "swiggy.com"
     t = _normalise(t)
     low = t.lower()
 
@@ -168,13 +174,18 @@ def parse_rules(text: str) -> TargetSpec:
 def _latin_runs(spec: TargetSpec, t: str) -> None:
     """Grammar-free fallback: role = the Latin phrase with a role word; company = the first other Latin phrase."""
     for run in re.findall(r"[A-Za-z][\w.&'\-]*(?:\s+[A-Za-z][\w.&'\-]*)*", t):
-        words = [w for w in run.split() if w.lower() not in COMPANY_STOP | NETWORK_FILLER | {"intro", "me", "please"}]
+        skip = COMPANY_STOP | NETWORK_FILLER | PREPS | {"intro", "me", "please"}
+        words = run.split()
+        while words and words[0].lower() in skip:       # trim filler at the edges only: keep "head of data"
+            words.pop(0)
+        while words and words[-1].lower() in skip:
+            words.pop()
         if not words:
             continue
         first_role = next((i for i, w in enumerate(words) if ROLE_RE.fullmatch(w.strip(".,"))), None)
         if first_role is None:
             if not spec.company and not _is_school(" ".join(words)):
-                spec.company = " ".join(words).strip(".,")
+                spec.company = " ".join(words).strip(".,")[:80]
             continue
         if first_role > 0 and not spec.company and not _is_school(" ".join(words[:first_role])):
             spec.company = " ".join(words[:first_role]).strip(".,")   # "Zepto CTO"
@@ -212,7 +223,8 @@ def _find_company(t: str, spec: TargetSpec) -> int | None:
             name = _company_words(t[m.end():])
             if not name or _is_school(name):
                 continue
-            if preps.startswith("of") and name.split()[0].lower() in {"the", "a", "an", "charge", "touch", "growth"}:
+            if preps.startswith("of") and (name.split()[0].lower() in {"the", "a", "an", "charge", "touch"}
+                                           or ROLE_RE.fullmatch(name.split()[0])):   # "vp of sales of X"
                 continue
             spec.company = name
             return m.start()
@@ -242,8 +254,8 @@ def _company_words(rest: str) -> str:
             break
         if len(out) == 3:
             break
-    name = " ".join(out).strip(" .")
-    return "" if not name or ROLE_RE.fullmatch(name) else name
+    name = " ".join(out).strip(" .")[:80]
+    return "" if not name or ROLE_RE.fullmatch(name) or set(name.lower().split()) <= PREPS else name
 
 
 def _network_companies(t: str) -> list[str]:
@@ -273,9 +285,9 @@ def _set_role_or_name(spec: TargetSpec, segment: str, had_verb: bool) -> None:
         spec.company, s = pre.group(1), pre.group(2)
     if ROLE_RE.search(s):
         spec.role = " ".join(ROLE_ABBR.get(w.lower(), w) for w in s.split())
-    elif had_verb and len(s.split()) <= 3 and all(re.fullmatch(r"[A-Za-z.'\-]+", w) for w in s.split()) \
-            and not _is_school(s) and s.lower() not in NETWORK_FILLER:
-        spec.person_name = s
+    elif had_verb and len(s.split()) <= 3 and all(NAME_WORD_RE.fullmatch(w) for w in s.split()) \
+            and not _is_school(s) and s.lower() not in NETWORK_FILLER and not set(s.lower().split()) & PREPS:
+        spec.person_name = HONORIFIC_RE.sub("", s) or s     # any script: "José Álvarez", "李明"
 
 
 def _in_text(value: str, text: str, threshold: int) -> bool:
