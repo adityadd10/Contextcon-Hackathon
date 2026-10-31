@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WarmPath</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js"></script>
+<style>
+:root{
+  --bg:#0b0d12; --panel:#12151c; --panel2:#181c25; --line:#252a36; --line2:#323848;
+  --text:#e7e9ee; --muted:#8b93a7; --dim:#5d6578;
+  --accent:#7c8cff; --accent2:#a78bfa; --target:#ff7a6b; --conn:#7c8cff; --seed:#3ecf8e;
+  --warn:#f5b941; --warnbg:#2a2210; --err:#ff6b6b; --ok:#3ecf8e;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{overflow-x:hidden;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+button{font:inherit;cursor:pointer}
+.wrap{max-width:1440px;margin:0 auto;padding:0 20px}
+
+/* header */
+header{border-bottom:1px solid var(--line);background:rgba(11,13,18,.85);backdrop-filter:blur(8px);position:sticky;top:0;z-index:20}
+header .wrap{display:flex;align-items:center;gap:20px;height:58px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:-.01em}
+.logo .mark{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--seed),var(--accent) 55%,var(--target));display:grid;place-items:center;font-size:15px}
+.logo small{font-weight:400;color:var(--muted);font-size:12.5px;margin-left:4px}
+nav{display:flex;gap:4px;margin-left:12px}
+nav button{background:none;border:0;color:var(--muted);padding:7px 14px;border-radius:8px}
+nav button.on{background:var(--panel2);color:var(--text)}
+.spacer{flex:1}
+.badge{font-size:11.5px;padding:3px 9px;border-radius:99px;border:1px solid var(--line2);color:var(--muted);white-space:nowrap}
+.badge.live{color:var(--ok);border-color:#1f5a40} .badge.fake{color:var(--warn);border-color:#5a4a1f}
+.btn{background:var(--panel2);border:1px solid var(--line2);color:var(--text);padding:7px 13px;border-radius:9px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:0;color:#fff;font-weight:600;padding:0 22px}
+.btn:disabled{opacity:.5;cursor:default}
+
+/* request */
+.hero{padding:26px 0 14px}
+.hero h1{margin:0 0 4px;font-size:23px;letter-spacing:-.02em}
+.hero p{margin:0 0 16px;color:var(--muted)}
+.ask{display:flex;gap:10px}
+.ask input{flex:1;background:var(--panel);border:1px solid var(--line2);border-radius:12px;color:var(--text);font-size:16px;padding:14px 16px;outline:none}
+.ask input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,140,255,.15)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.chip{background:var(--panel);border:1px solid var(--line);color:var(--muted);border-radius:99px;padding:5px 12px;font-size:12.5px}
+.chip:hover{color:var(--text);border-color:var(--line2)}
+label.toggle{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:12.5px;margin-left:auto;cursor:pointer}
+
+/* layout */
+.grid{display:grid;grid-template-columns:340px 1fr;gap:18px;padding-bottom:40px}
+@media (max-width:980px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px}
+.card h3{margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.card .hd{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line)}
+.card .bd{padding:14px 16px}
+.empty{color:var(--dim);text-align:center;padding:30px 10px;font-size:13px}
+
+/* steps */
+.steps{list-style:none;margin:0;padding:0}
+.step{position:relative;padding:0 0 14px 28px}
+.step:before{content:"";position:absolute;left:8px;top:20px;bottom:0;width:1px;background:var(--line2)}
+.step:last-child:before{display:none}
+.step .ic{position:absolute;left:0;top:2px;width:17px;height:17px;border-radius:50%;border:2px solid var(--accent);display:grid;place-items:center;font-size:10px;font-weight:700}
+.step.start .ic{border-top-color:transparent;animation:spin .8s linear infinite}
+.step.done .ic{background:var(--ok);border-color:var(--ok);color:#06210f}
+.step.done .ic:after{content:"✓"}
+.step.error .ic{background:var(--err);border-color:var(--err);color:#fff}
+.step.error .ic:after{content:"!"}
+@keyframes spin{to{transform:rotate(360deg)}}
+.step .lb{font-weight:600}
+.step .dt{color:var(--muted);font-size:12.5px;word-break:break-word}
+.step .subs{margin:6px 0 0;padding:0;list-style:none}
+.step .subs li{font-size:12.5px;color:var(--muted);padding:3px 0 3px 10px;border-left:2px solid var(--line2);margin-bottom:3px}
+.step .subs li b{color:var(--text);font-weight:500}
+.step .subs li.w{border-left-color:var(--warn);color:var(--warn)}
+
+.warns{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.warn{background:var(--warnbg);border:1px solid #5a4a1f;color:var(--warn);border-radius:10px;padding:9px 12px;font-size:13px;display:flex;gap:9px}
+.warn.e{background:#2a1214;border-color:#5a2226;color:var(--err)}
+
+/* result area */
+.main{display:flex;flex-direction:column;gap:18px;min-width:0}
+.summary{display:flex;gap:10px;flex-wrap:wrap}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:120px}
+.stat b{display:block;font-size:20px;letter-spacing:-.02em}
+.stat span{color:var(--muted);font-size:12px}
+#runGraph{height:380px}
+#graphNet{height:calc(100vh - 230px);min-height:480px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-left:auto}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.tabs{display:flex;gap:4px}
+.tabs button{background:none;border:0;color:var(--muted);padding:5px 11px;border-radius:7px;font-size:13px}
+.tabs button.on{background:var(--panel2);color:var(--text)}
+.tabs .n{font-size:11px;background:var(--line2);border-radius:99px;padding:0 6px;margin-left:4px}
+
+/* path cards */
+.path{border:1px solid var(--line);border-radius:12px;background:var(--panel2);margin-bottom:12px;overflow:hidden}
+.path .top{display:flex;align-items:center;gap:14px;padding:13px 15px;cursor:pointer}
+.rank{font-weight:700;color:var(--muted);font-size:13px;width:24px}
+.score{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:16px;flex:none;
+  background:conic-gradient(var(--c) calc(var(--p)*1%),var(--line) 0)}
+.score span{width:44px;height:44px;border-radius:50%;background:var(--panel2);display:grid;place-items:center}
+.chain{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-weight:600}
+.chain .arrow{color:var(--dim);font-weight:400}
+.chain .who{padding:2px 9px;border-radius:7px;background:var(--panel);border:1px solid var(--line2)}
+.chain .who.t{border-color:var(--target);color:var(--target)}
+.chain .who.s{border-color:var(--seed);color:var(--seed)}
+.why{color:var(--muted);font-size:12.5px;margin-top:3px}
+.tie{border-top:1px solid var(--line);padding:12px 15px 6px}
+.tie .th{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}
+.tie .th b{font-size:13.5px}
+.tie .th .pts{margin-left:auto;font-family:var(--mono);font-size:12.5px;color:var(--accent)}
+.factor{display:grid;grid-template-columns:52px 1fr;gap:8px;padding:5px 0;border-top:1px dashed var(--line)}
+.factor:first-of-type{border-top:0}
+.factor .c{font-family:var(--mono);color:var(--ok);font-size:12.5px;text-align:right}
+.factor .e{font-size:13px}
+.cites{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+.cite{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:6px;background:var(--panel);border:1px solid var(--line2);color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cite.crustdata{border-color:#2d3a7a;color:#aab4ff}
+.cite.web{border-color:#5a3d7a;color:#d0b4ff}
+.cite.derived{border-color:var(--line2)}
+a.cite:hover{text-decoration:none;border-color:var(--accent);color:var(--text)}
+.collapsed .tie{display:none}
+
+/* drafts */
+.draft{border:1px solid var(--line);border-radius:12px;background:var(--panel2);margin-bottom:12px}
+.draft .dh{padding:12px 15px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.draft .dh b{font-size:14px}
+.draft pre{white-space:pre-wrap;font:13.5px/1.6 inherit;margin:0;padding:14px 15px;font-family:inherit}
+.draft .blurb{margin:0 15px 14px;border-left:3px solid var(--accent);background:var(--panel);border-radius:0 8px 8px 0}
+.draft .blurb h4{margin:0;padding:9px 12px 0;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.draft .blurb pre{padding:6px 12px 10px}
+.ok{color:var(--ok)} .bad{color:var(--err)}
+.pill{font-size:11.5px;padding:2px 8px;border-radius:99px;border:1px solid var(--line2);color:var(--muted)}
+.pill.ok{border-color:#1f5a40;color:var(--ok)} .pill.bad{border-color:#5a2226;color:var(--err)}
+
+/* drawer */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(720px,100%);background:var(--panel);border-left:1px solid var(--line2);
+  transform:translateX(100%);visibility:hidden;transition:transform .25s ease,visibility .25s;z-index:40;display:flex;flex-direction:column;box-shadow:-20px 0 60px rgba(0,0,0,.5)}
+.drawer.open{transform:none;visibility:visible}
+.drawer .hd{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line)}
+.drawer .bd{overflow:auto;padding:0 18px 18px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;color:var(--muted);font-weight:500;padding:10px 6px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+td.m{font-family:var(--mono);font-size:11.5px}
+details summary{cursor:pointer;color:var(--muted)}
+details pre{font-family:var(--mono);font-size:11px;background:var(--bg);padding:8px;border-radius:6px;white-space:pre-wrap;word-break:break-all;margin:6px 0 0}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:35;display:none}
+.scrim.open{display:block}
+
+/* graph tab */
+.ggrid{display:grid;grid-template-columns:1fr 360px;gap:18px;padding:20px 0 40px}
+@media (max-width:1100px){.ggrid{grid-template-columns:1fr}}
+.side{display:flex;flex-direction:column;gap:14px}
+select,.side input{width:100%;background:var(--panel2);border:1px solid var(--line2);color:var(--text);border-radius:9px;padding:8px 10px;font:inherit;outline:none}
+.row{display:flex;gap:8px;margin-top:8px}
+.broker{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer}
+.broker:last-child{border:0}
+.broker span{color:var(--muted);font-family:var(--mono);font-size:12px}
+.log{font-family:var(--mono);font-size:11.5px;color:var(--muted);max-height:180px;overflow:auto;margin-top:10px}
+.log div{padding:2px 0}
+.hint{color:var(--dim);font-size:12px;margin-top:6px}
+#edgeInfo .bd{max-height:420px;overflow:auto}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="logo"><div class="mark">↝</div>WarmPath<small>warm intros, every link verified</small></div>
+  <nav>
+    <button class="on" data-tab="find">Find a path</button>
+    <button data-tab="graph">Social graph</button>
+  </nav>
+  <div class="spacer"></div>
+  <span class="badge" id="mode">checking…</span>
+  <span class="badge" id="gstat">graph: –</span>
+  <button class="btn" id="auditBtn">Audit trail</button>
+</div></header>
+
+<!-- ============================================================ FIND -->
+<section id="tab-find" class="wrap">
+  <div class="hero">
+    <h1>Who do you want to reach?</h1>
+    <p>Describe the person in plain words. WarmPath resolves them on Crustdata, finds people who actually worked alongside them, and drafts the intro ask. Nothing is ever sent.</p>
+    <form class="ask" id="askForm">
+      <input id="q" autocomplete="off" placeholder="warm intro to whoever runs data at Swiggy, ideally via IITB folks">
+      <button class="btn primary" id="go">Find warm paths</button>
+    </form>
+    <div class="chips" id="chips">
+      <button class="chip" type="button">warm intro to whoever runs data at Swiggy, ideally via IITB folks</button>
+      <button class="chip" type="button">intro to Priya Sharma at Swigy Pvt Ltd</button>
+      <button class="chip" type="button">https://www.linkedin.com/in/priya-sharma for hiring</button>
+      <label class="toggle"><input type="checkbox" id="mock"> offline replay</label>
+    </div>
+  </div>
+
+  <div class="grid">
+    <aside class="card" style="align-self:start">
+      <div class="hd"><h3>Live steps</h3><span class="spacer"></span><span class="badge" id="elapsed">idle</span></div>
+      <div class="bd"><ul class="steps" id="steps"><li class="empty">Steps stream here as WarmPath works, with the reason behind each decision.</li></ul></div>
+    </aside>
+
+    <div class="main">
+      <div class="warns" id="warns"></div>
+      <div class="summary" id="summary"></div>
+
+      <div class="card">
+        <div class="hd"><h3>Path graph</h3>
+          <div class="legend"><span><i style="background:var(--seed)"></i>your team</span><span><i style="background:var(--conn)"></i>connector</span><span><i style="background:var(--target)"></i>target</span><span>edge width = tie strength · click an edge for evidence</span></div>
+        </div>
+        <div id="runGraph"></div>
+        <div id="runEdge" class="bd hide" style="border-top:1px solid var(--line)"></div>
+      </div>
+
+      <div class="card">
+        <div class="hd">
+          <div class="tabs" id="rtabs">
+            <button class="on" data-r="paths">Intro paths<span class="n" id="nPaths">0</span></button>
+            <button data-r="drafts">Drafts<span class="n" id="nDrafts">0</span></button>
+          </div>
+        </div>
+        <div class="bd" id="r-paths"><div class="empty">Ranked intro paths appear here. Each tie lists its factors and the Crustdata records behind them.</div></div>
+        <div class="bd hide" id="r-drafts"><div class="empty">Intro requests are written to <code>outbox/</code>. WarmPath never contacts anyone.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ GRAPH -->
+<section id="tab-graph" class="wrap hide">
+  <div class="ggrid">
+    <div class="card">
+      <div class="hd"><h3>WarmPath social graph</h3><span class="spacer"></span>
+        <span class="legend" style="margin:0"><span><i style="background:var(--conn)"></i>person</span><span><i style="background:#c08a3e;border-radius:2px"></i>company</span><span><i style="background:#4fb3c9;border-radius:2px"></i>school</span></span>
+        <button class="btn" id="gAll">Whole graph</button>
+      </div>
+      <div id="graphNet"></div>
+    </div>
+    <div class="side">
+      <div class="summary" id="gSummary"></div>
+      <div class="card" id="edgeInfo"><div class="hd"><h3>Relationship evidence</h3></div>
+        <div class="bd"><div class="empty" style="padding:12px">Click a KNOWS edge (between two people) to see why WarmPath thinks they know each other. Double-click a person to focus on their network.</div></div></div>
+      <div class="card"><div class="hd"><h3>Path between two people</h3></div>
+        <div class="bd">
+          <select id="pA"></select><div class="row"><select id="pB"></select></div>
+          <div class="row"><button class="btn" id="pGo" style="width:100%">Find strongest chain</button></div>
+          <div id="pOut"></div>
+        </div></div>
+      <div class="card"><div class="hd"><h3>Super-connectors</h3></div>
+        <div class="bd" id="brokers"><div class="empty" style="padding:12px">Best intro brokers (betweenness) appear once the graph has relationships.</div></div></div>
+      <div class="card"><div class="hd"><h3>Crawl my network</h3></div>
+        <div class="bd">
+          <input id="seeds" placeholder="profile URLs, comma-separated (blank = WARMPATH_SEEDS)">
+          <div class="row"><select id="depth" style="width:110px"><option value="1">depth 1</option><option value="2">depth 2</option></select>
+            <button class="btn" id="crawlGo" style="flex:1">Crawl</button></div>
+          <div class="hint">Breadth-first over shared employers, within a credit budget. The graph grows live.</div>
+          <div class="log" id="crawlLog"></div>
+        </div></div>
+    </div>
+  </div>
+</section>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer">
+  <div class="hd"><h3 style="margin:0;font-size:15px">Audit trail</h3><span class="badge" id="auditSum">no run yet</span><span class="spacer"></span><button class="btn" id="auditClose">Close</button></div>
+  <div class="bd" id="auditBody"><div class="empty">Every Crustdata call is logged with its request, credits and a sha256 of the response.</div></div>
+</aside>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safeUrl = u => /^https?:\/\//i.test(u || "") ? u : null;
+const COLORS = {target:"#ff7a6b", connector:"#7c8cff", seed:"#3ecf8e", company:"#c08a3e", school:"#4fb3c9"};
+const scoreColor = s => s >= 70 ? "#3ecf8e" : s >= 45 ? "#7c8cff" : "#f5b941";
+const tieKey = (a, b) => [a, b].sort((x, y) => x - y).join("-");
+
+/* ------------------------------------------------------------ tabs */
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("on", x === b));
+  $("#tab-find").classList.toggle("hide", b.dataset.tab !== "find");
+  $("#tab-graph").classList.toggle("hide", b.dataset.tab !== "graph");
+  if (b.dataset.tab === "graph") loadGraph();
+});
+document.querySelectorAll("#rtabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#rtabs button").forEach(x => x.classList.toggle("on", x === b));
+  $("#r-paths").classList.toggle("hide", b.dataset.r !== "paths");
+  $("#r-drafts").classList.toggle("hide", b.dataset.r !== "drafts");
+});
+
+/* ------------------------------------------------------------ status */
+async function refreshStatus() {
+  try {
+    const h = await (await fetch("/api/health")).json();
+    const m = $("#mode");
+    if (h.fake) { m.textContent = "offline fake world"; m.className = "badge fake"; }
+    else if (h.live_key) { m.textContent = "live · Crustdata"; m.className = "badge live"; }
+    else { m.textContent = "no API key · use replay"; m.className = "badge fake"; $("#mock").checked = true; }
+  } catch { $("#mode").textContent = "server offline"; }
+  refreshGraphStat();
+}
+async function refreshGraphStat() {
+  try {
+    const s = await (await fetch("/api/graph/stats")).json();
+    $("#gstat").textContent = `graph: ${s.people} people · ${s.relationships} relationships`;
+    return s;
+  } catch { return null; }
+}
+
+/* ------------------------------------------------------------ evidence rendering (shared) */
+function citeHtml(ev) {
+  const url = safeUrl(ev.url);
+  const txt = `${ev.kind === "web" ? "web" : ev.endpoint} · ${ev.ref}`;
+  const title = esc(`${ev.claim}\n${ev.endpoint} ${ev.ref}${ev.call_id ? " · call " + ev.call_id : ""}`);
+  return url ? `<a class="cite ${esc(ev.kind)}" href="${esc(url)}" target="_blank" rel="noopener" title="${title}">${esc(txt)} ↗</a>`
+             : `<span class="cite ${esc(ev.kind)}" title="${title}">${esc(txt)}</span>`;
+}
+function tieHtml(t) {
+  const facs = (t.factors || []).map(f => `
+    <div class="factor"><div class="c">+${Number(f.contribution).toFixed(1)}</div>
+      <div><div class="e">${esc(f.explanation)}</div>
+      ${(f.evidence || []).length ? `<div class="cites">${f.evidence.map(citeHtml).join("")}</div>` : ""}</div></div>`).join("");
+  return `<div class="tie"><div class="th"><b>${esc(t.a?.name)} ↔ ${esc(t.b?.name)}</b>
+      <span class="pill">${esc(t.kind)}</span><span class="pts">${Number(t.score).toFixed(1)}/100</span></div>${facs ||
+      '<div class="hint">No factors recorded.</div>'}</div>`;
+}
+
+/* ------------------------------------------------------------ run graph */
+let runNodes, runEdges, runNet;
+function initRunGraph() {
+  runNodes = new vis.DataSet(); runEdges = new vis.DataSet();
+  runNet = new vis.Network($("#runGraph"), {nodes: runNodes, edges: runEdges}, {
+    nodes: {shape: "dot", font: {color: "#e7e9ee", size: 13, face: "Inter, sans-serif", multi: "html"}, borderWidth: 2},
+    edges: {color: {color: "#3a4157", highlight: "#a78bfa", hover: "#a78bfa"}, font: {color: "#8b93a7", size: 11, strokeWidth: 0, align: "top"},
+            smooth: {type: "continuous"}, hoverWidth: 1.5},
+    physics: {solver: "forceAtlas2Based", forceAtlas2Based: {gravitationalConstant: -80, springLength: 150}, stabilization: {iterations: 120}},
+    interaction: {hover: true, tooltipDelay: 150}
+  });
+  runNet.on("stabilizationIterationsDone", () => runNet.fit());
+  runNet.on("click", p => { if (p.edges.length && !p.nodes.length) showRunEdge(p.edges[0]); });
+}
+const roleRank = {target: 3, seed: 2, connector: 1};
+function addRunNode(role, p) {
+  if (p.person_id == null) return;
+  const old = runNodes.get(p.person_id);
+  if (old && roleRank[old.role] >= roleRank[role]) return;
+  const c = COLORS[role];
+  runNodes.update({id: p.person_id, role,
+    label: `<b>${esc(p.name)}</b>\n${esc((p.current_title || p.headline || "").slice(0, 34))}`,
+    title: `${p.name}${p.current_title ? " · " + p.current_title : ""}`,
+    size: role === "target" ? 26 : role === "seed" ? 18 : 20,
+    color: {background: c, border: c, highlight: {background: c, border: "#fff"}, hover: {background: c, border: "#fff"}}});
+}
+function addRunEdge(e) {
+  if (e.a == null || e.b == null) return;
+  const id = tieKey(e.a, e.b), old = runEdges.get(id);
+  const label = old && e.label === "web co-mention" ? `${old.baseLabel} + web` : e.label;
+  runEdges.update({id, from: e.a, to: e.b, score: e.score, baseLabel: old?.baseLabel || e.label,
+    label: `${Math.round(e.score)} · ${label.split(" · ")[0]}`, title: `${Math.round(e.score)}/100 · ${label}`,
+    width: 1 + e.score / 14, color: {color: scoreColor(e.score), opacity: .75, inherit: false}});
+}
+function showRunEdge(id) {
+  const box = $("#runEdge"); box.classList.remove("hide");
+  for (const p of state.paths) for (const t of p.ties)
+    if (tieKey(t.a.person_id, t.b.person_id) === id) { box.innerHTML = tieHtml(t); return; }
+  const e = runEdges.get(id);
+  box.innerHTML = `<div class="hint">${esc(e?.label)} · evidence arrives with the scored paths.</div>`;
+}
+
+/* ------------------------------------------------------------ run state + events */
+let state, es, timer;
+function reset() {
+  state = {steps: {}, paths: [], drafts: [], audit: [], t0: Date.now()};
+  $("#steps").innerHTML = ""; $("#warns").innerHTML = ""; $("#summary").innerHTML = "";
+  $("#r-paths").innerHTML = '<div class="empty">Working…</div>'; $("#r-drafts").innerHTML = '<div class="empty">Drafts appear after scoring.</div>';
+  $("#nPaths").textContent = "0"; $("#nDrafts").textContent = "0"; $("#runEdge").classList.add("hide");
+  runNodes.clear(); runEdges.clear();
+  clearInterval(timer);
+  timer = setInterval(() => $("#elapsed").textContent = ((Date.now() - state.t0) / 1000).toFixed(1) + "s", 100);
+}
+function onStep(e) {
+  let li = state.steps[e.id];
+  if (!li) {
+    li = document.createElement("li");
+    li.innerHTML = '<div class="ic"></div><div class="lb"></div><div class="dt"></div><ul class="subs"></ul>';
+    $("#steps").appendChild(li); state.steps[e.id] = li;
+  }
+  if (e.status === "progress") {
+    const s = document.createElement("li");
+    s.innerHTML = `<b>${esc(e.label)}</b>${e.detail ? " · " + esc(e.detail) : ""}`;
+    li.querySelector(".subs").appendChild(s);
+    return;
+  }
+  li.className = "step " + e.status;
+  li.querySelector(".lb").textContent = e.label;
+  li.querySelector(".dt").textContent = e.detail || "";
+  const parser = e.id === "parse" && /parser=(\w+)/.exec(e.detail || "");
+  if (parser) li.querySelector(".lb").insertAdjacentHTML("beforeend", parser[1] === "llm"
+    ? ' <span class="pill ok">LLM parser</span>' : ' <span class="pill">rules parser</span>');
+}
+function addWarning(msg, isErr) {
+  const d = document.createElement("div");
+  d.className = "warn" + (isErr ? " e" : "");
+  d.innerHTML = `<span>${isErr ? "✕" : "⚠"}</span><span>${esc(msg)}</span>`;
+  $("#warns").appendChild(d);
+  const open = Object.values(state.steps).pop();   // also pin it under the step it happened in
+  if (open) { const s = document.createElement("li"); s.className = "w"; s.textContent = "⚠ " + msg; open.querySelector(".subs").appendChild(s); }
+}
+function renderPaths() {
+  const box = $("#r-paths");
+  $("#nPaths").textContent = state.paths.length;
+  if (!state.paths.length) { box.innerHTML = '<div class="empty">No paths yet.</div>'; return; }
+  const seedIds = new Set(runNodes.get().filter(n => n.role === "seed").map(n => n.id));
+  box.innerHTML = state.paths.sort((a, b) => a.rank - b.rank).map((p, i) => {
+    const last = p.nodes.length - 1;
+    const chain = p.nodes.map((n, j) => `<span class="who ${j === last ? "t" : seedIds.has(n.person_id) ? "s" : ""}">${esc(n.name)}</span>`)
+                         .join('<span class="arrow">→</span>');
+    const s = Math.round(p.score);
+    return `<div class="path ${i ? "collapsed" : ""}">
+      <div class="top" onclick="this.parentNode.classList.toggle('collapsed')">
+        <div class="rank">#${p.rank}</div>
+        <div class="score" style="--p:${s};--c:${scoreColor(s)}"><span>${s}</span></div>
+        <div style="min-width:0"><div class="chain">${chain}</div><div class="why">${esc(p.why)}</div></div>
+      </div>${p.ties.map(tieHtml).join("")}</div>`;
+  }).join("");
+}
+function renderDrafts() {
+  const box = $("#r-drafts");
+  $("#nDrafts").textContent = state.drafts.length;
+  box.innerHTML = state.drafts.map(d => {
+    const bad = d.claims_unsupported || [];
+    return `<div class="draft"><div class="dh"><b>To ${esc(d.to)}</b><span class="hint" style="margin:0">${esc(d.subject)}</span>
+      <span class="spacer" style="flex:1"></span>
+      <span class="pill ${bad.length ? "bad" : "ok"}">${bad.length ? `✕ ${bad.length} unsupported` : `✓ ${d.claims_checked} claims cited`}</span>
+      <span class="pill">path #${d.path_rank} · saved to outbox/, not sent</span></div>
+      <pre>${esc(d.body)}</pre>
+      <div class="blurb"><h4>Forwardable blurb</h4><pre>${esc(d.forwardable_blurb)}</pre></div>
+      ${bad.length ? `<div class="bd bad" style="padding-top:0">Unsupported: ${bad.map(esc).join(" · ")}</div>` : ""}</div>`;
+  }).join("") || '<div class="empty">No drafts.</div>';
+}
+function renderSummary(r) {
+  const t = r.target, co = r.target_company;
+  $("#summary").innerHTML = [
+    t && [esc(t.name), `target · ${esc(t.current_title || "")}${co ? " @ " + esc(co.name) : ""}`],
+    [r.paths.length, "warm paths"],
+    [r.paths[0] ? Math.round(r.paths[0].score) + "/100" : "–", "best path"],
+    [r.audit.length, "API calls"],
+    [r.credits_used, "credits used"],
+    [r.elapsed_s + "s", "end to end"],
+  ].filter(Boolean).map(([b, s]) => `<div class="stat"><b>${b}</b><span>${s}</span></div>`).join("");
+}
+function renderAudit(audit, credits) {
+  $("#auditSum").textContent = `${audit.length} calls · ${credits} credits`;
+  $("#auditBtn").textContent = `Audit trail · ${audit.length}`;
+  $("#auditBody").innerHTML = audit.length ? `<table><thead><tr><th>call</th><th>endpoint</th><th>status</th><th>credits</th><th>response sha256</th></tr></thead><tbody>${
+    audit.map(c => `<tr><td class="m">${esc(c.call_id)}</td>
+      <td>${esc(c.endpoint)}${c.cached ? ' <span class="pill">cached</span>' : ""}
+        <details><summary>request</summary><pre>${esc(JSON.stringify(c.request, null, 1))}</pre></details></td>
+      <td class="${c.status < 400 ? "ok" : "bad"}">${esc(c.status)}${c.error ? "<br>" + esc(c.error) : ""}</td>
+      <td class="m">${esc(c.credits)}</td><td class="m" title="${esc(c.sha256)}">${esc((c.sha256 || "").slice(0, 16))}…</td></tr>`).join("")
+  }</tbody></table>` : '<div class="empty">No calls recorded.</div>';
+}
+function handle(e) {
+  switch (e.type) {
+    case "step": onStep(e); break;
+    case "node": addRunNode(e.role, e.person); break;
+    case "edge": addRunEdge(e); break;
+    case "warning": addWarning(e.message); break;
+    case "error": addWarning(e.message, true); break;
+    case "graph": $("#gstat").textContent = `graph: ${e.stats.people} people · ${e.stats.relationships} relationships`; break;
+    case "path": state.paths = state.paths.filter(p => p.rank !== e.path.rank).concat(e.path); renderPaths(); break;
+    case "draft": state.drafts.push(e.draft); renderDrafts(); break;
+    case "done": {
+      const r = e.result;
+      state.paths = r.paths; renderPaths(); renderSummary(r); renderAudit(r.audit, r.credits_used);
+      (r.warnings || []).forEach(w => { if (![...$("#warns").children].some(d => d.textContent.includes(w))) addWarning(w); });
+      runNet.fit({animation: true});
+      break;
+    }
+    case "end": finish(); break;
+  }
+}
+function finish() {
+  if (es) es.close(); es = null;
+  clearInterval(timer); $("#go").disabled = false;
+  $("#elapsed").textContent = ((Date.now() - state.t0) / 1000).toFixed(1) + "s · done";
+  Object.values(state.steps).forEach(li => { if (li.classList.contains("start")) li.className = "step error"; });
+}
+function start(q) {
+  const mock = $("#mock").checked;
+  if (!q && !mock) { $("#q").focus(); return; }
+  if (es) es.close();
+  reset(); $("#go").disabled = true;
+  es = new EventSource(mock ? "/api/run?mock=1" : "/api/run?q=" + encodeURIComponent(q));
+  es.onmessage = m => handle(JSON.parse(m.data));
+  es.onerror = () => { if (es) { addWarning("Connection to the server closed.", true); finish(); } };
+}
+$("#askForm").onsubmit = ev => { ev.preventDefault(); start($("#q").value.trim()); };
+$("#chips").querySelectorAll(".chip").forEach(c => c.onclick = () => { $("#q").value = c.textContent; start(c.textContent); });
+
+/* ------------------------------------------------------------ audit drawer */
+const drawer = open => { $("#drawer").classList.toggle("open", open); $("#scrim").classList.toggle("open", open); };
+$("#auditBtn").onclick = () => drawer(true);
+$("#auditClose").onclick = $("#scrim").onclick = () => drawer(false);
+document.addEventListener("keydown", e => { if (e.key === "Escape") drawer(false); });
+
+/* ------------------------------------------------------------ graph explorer */
+let gNodes, gEdges, gNet, gPeople = [];
+function initGraphNet() {
+  gNodes = new vis.DataSet(); gEdges = new vis.DataSet();
+  gNet = new vis.Network($("#graphNet"), {nodes: gNodes, edges: gEdges}, {
+    nodes: {font: {color: "#c9cdd8", size: 12}, borderWidth: 1.5},
+    edges: {smooth: {type: "continuous"}, hoverWidth: 1.5, selectionWidth: 2},
+    physics: {solver: "forceAtlas2Based", forceAtlas2Based: {gravitationalConstant: -60, springLength: 110}, stabilization: {iterations: 200}},
+    interaction: {hover: true, tooltipDelay: 120}
+  });
+  gNet.on("click", p => {
+    if (p.nodes.length || !p.edges.length) return;
+    const e = gEdges.get(p.edges[0]);
+    if (e?.type === "KNOWS") explainEdge(e.from, e.to);
+  });
+  gNet.on("stabilizationIterationsDone", () => gNet.fit());
+  gNet.on("doubleClick", p => { const n = p.nodes[0]; if (n && String(n).startsWith("person:")) loadGraph(n); });
+}
+const pid = id => Number(String(id).split(":")[1]);
+async function explainEdge(a, b) {
+  const box = $("#edgeInfo .bd");
+  box.innerHTML = '<div class="hint">Loading evidence…</div>';
+  try {
+    const r = await fetch(`/api/graph/tie?a=${pid(a)}&b=${pid(b)}`);
+    if (!r.ok) throw new Error(await r.text());
+    box.innerHTML = tieHtml(await r.json()).replace('class="tie"', 'class="tie" style="border:0;padding:0"');
+  } catch (err) { box.innerHTML = `<div class="bad">${esc(err.message)}</div>`; }
+}
+async function loadGraph(center) {
+  if (!gNet) initGraphNet();
+  const url = center ? `/api/graph/subgraph?center=${encodeURIComponent(center)}&depth=2` : "/api/graph/subgraph";
+  const [sg, stats] = await Promise.all([fetch(url).then(r => r.json()), refreshGraphStat()]);
+  const degree = {};
+  sg.edges.filter(e => e.type === "KNOWS").forEach(e => { degree[e.src] = (degree[e.src] || 0) + 1; degree[e.dst] = (degree[e.dst] || 0) + 1; });
+  gNodes.clear(); gEdges.clear();
+  gNodes.add(sg.nodes.map(n => {
+    const c = n.type === "person" ? (n.id === center ? COLORS.target : COLORS.connector) : COLORS[n.type] || "#888";
+    return {id: n.id, label: n.label, title: `${n.type}: ${n.label}`, shape: n.type === "person" ? "dot" : "square",
+      size: n.type === "person" ? 10 + 3 * Math.min(8, degree[n.id] || 0) : 9,
+      color: {background: c, border: c, highlight: {background: c, border: "#fff"}},
+      font: {color: n.type === "person" ? "#e7e9ee" : "#8b93a7", size: n.type === "person" ? 13 : 11}};
+  }));
+  const ids = new Set(sg.nodes.map(n => n.id));
+  gEdges.add(sg.edges.filter(e => ids.has(e.src) && ids.has(e.dst)).map((e, i) => e.type === "KNOWS"
+    ? {id: "k" + i, from: e.src, to: e.dst, type: e.type, width: 1 + (e.weight || 0) / 12,
+       color: {color: scoreColor(e.weight || 0), opacity: .85, inherit: false}, title: `KNOWS · ${Math.round(e.weight)}/100 · click for evidence`}
+    : {id: "m" + i, from: e.src, to: e.dst, type: e.type, width: .6, dashes: e.type === "STUDIED_AT",
+       color: {color: "#3a4157", opacity: .7, inherit: false}, title: `${e.type}${e.props?.title ? " · " + e.props.title : ""}`}));
+  if (stats) $("#gSummary").innerHTML = [[stats.people, "people"], [stats.relationships, "verified relationships"],
+    [stats.nodes?.company || 0, "companies"], [stats.nodes?.school || 0, "schools"]]
+    .map(([b, s]) => `<div class="stat" style="min-width:0;flex:1"><b>${b}</b><span>${s}</span></div>`).join("");
+  gPeople = sg.nodes.filter(n => n.type === "person").sort((a, b) => a.label.localeCompare(b.label));
+  if (!center) {
+    const opts = gPeople.map(n => `<option value="${pid(n.id)}">${esc(n.label)} (#${pid(n.id)})</option>`).join("");
+    const [a, b] = [$("#pA").value, $("#pB").value];
+    $("#pA").innerHTML = opts; $("#pB").innerHTML = opts;
+    if (a) $("#pA").value = a;
+    $("#pB").value = b || (gPeople[1] ? pid(gPeople[1].id) : "");
+  }
+  loadBrokers();
+}
+async function loadBrokers() {
+  const rows = await fetch("/api/graph/brokers").then(r => r.json()).catch(() => []);
+  $("#brokers").innerHTML = rows.length ? rows.map(r =>
+    `<div class="broker" data-id="${esc(r.id)}">${esc(r.name)}<span>${r.betweenness.toFixed(3)} · ${r.degree} ties</span></div>`).join("")
+    : '<div class="empty" style="padding:12px">No relationships yet. Run a query or crawl.</div>';
+  $("#brokers").querySelectorAll(".broker").forEach(d => d.onclick = () => { gNet.selectNodes([d.dataset.id]); gNet.focus(d.dataset.id, {scale: 1.2, animation: true}); });
+}
+$("#gAll").onclick = () => loadGraph();
+$("#pGo").onclick = async () => {
+  const a = $("#pA").value, b = $("#pB").value, out = $("#pOut");
+  if (!a || !b || a === b) { out.innerHTML = '<div class="hint">Pick two different people.</div>'; return; }
+  const r = await fetch(`/api/graph/path?a=${a}&b=${b}&max_hops=6`).then(r => r.json());
+  if (!r.found) { out.innerHTML = '<div class="hint">No chain in the graph yet. Crawl more of the network.</div>'; return; }
+  const nodeIds = r.ids.map(i => "person:" + i);
+  gNet.selectNodes(nodeIds); gNet.fit({nodes: nodeIds, animation: true});
+  out.innerHTML = `<div class="chain" style="margin:12px 0 4px">${r.people.map(p => `<span class="who">${esc(p.name)}</span>`).join('<span class="arrow">→</span>')}</div>
+    <div class="hint">${r.hops} hop${r.hops > 1 ? "s" : ""} · strongest chain (Dijkstra on −ln(score/100))</div>
+    <div style="margin:0 -16px">${r.ties.map(tieHtml).join("")}</div>`;
+};
+let crawlES;
+$("#crawlGo").onclick = () => {
+  if (crawlES) crawlES.close();
+  const log = $("#crawlLog"); log.innerHTML = "";
+  const line = (t, cls) => { const d = document.createElement("div"); d.textContent = t; if (cls) d.className = cls; log.appendChild(d); log.scrollTop = 1e9; };
+  const qs = new URLSearchParams({seeds: $("#seeds").value.trim(), depth: $("#depth").value});
+  $("#crawlGo").disabled = true;
+  let pending;
+  crawlES = new EventSource("/api/crawl?" + qs);
+  crawlES.onmessage = m => {
+    const e = JSON.parse(m.data);
+    if (e.type === "step") { line(`${e.status === "done" ? "✓" : "·"} ${e.label}${e.detail ? " · " + e.detail : ""}`); clearTimeout(pending); pending = setTimeout(() => loadGraph(), 400); }
+    else if (e.type === "node") line(`+ seed ${e.person.name}`);
+    else if (e.type === "warning") line("⚠ " + e.message, "bad");
+    else if (e.type === "error") line("✕ " + e.message, "bad");
+    else if (e.type === "end") { crawlES.close(); crawlES = null; $("#crawlGo").disabled = false; loadGraph(); }
+  };
+  crawlES.onerror = () => { if (crawlES) { line("✕ connection closed (is a seed URL or API key missing?)", "bad"); crawlES.close(); crawlES = null; $("#crawlGo").disabled = false; } };
+};
+
+/* ------------------------------------------------------------ boot */
+initRunGraph(); refreshStatus();
+</script>
+</body>
+</html>
