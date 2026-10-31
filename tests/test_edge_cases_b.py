@@ -167,3 +167,21 @@ def test_check_claims_does_not_split_at_company_abbreviations():
     text = f"I noticed you two overlapped at {co} (2015–2018), so you might be the right person to ask."
     assert draft.check_claims(text, p) == []
     assert draft.check_claims("Dr. Rao said you worked at Google in 2012.", p)          # still catches lies
+
+
+@pytest.mark.parametrize("text,company,role", [
+    ("warm intro to the people with ESRI working", "ESRI", None),       # tried live by Vaibhav: was a "person"
+    ("warm intro to people working at ESRI", "ESRI", None),
+    ("intro to someone working with ESRI", "ESRI", None),
+    ("intro to ESRI employees", "ESRI", None),
+    ("connect me with people who work at ESRI", "ESRI", None),
+    ("intro to the head of data with Swiggy", "Swiggy", "head of data"),
+])
+def test_people_at_company_phrasings(text, company, role):
+    s = parse_rules(text)
+    assert (s.company, s.role, s.person_name) == (company, role, None)
+
+
+def test_people_at_rules_keep_real_names():
+    assert parse_rules("connect me with Kunal Shah from CRED").person_name == "Kunal Shah"
+    assert parse_rules("intro to Priya Sharma").person_name == "Priya Sharma"

@@ -19,6 +19,17 @@ COMPANY_URL_RE = re.compile(r"https?://(?:[a-z]{2,3}\.)?linkedin\.com/company/[\
 WEB_URL_RE = re.compile(r"https?://(?:www\.)?([a-z0-9\-]+(?:\.[a-z0-9\-]+)+)(?:/\S*)?", re.I)
 MAX_INPUT = 2000
 PREPS = {"at", "of", "in", "from", "@", "to", "via", "for"}
+NOT_NAME = PREPS | {"with", "working", "work", "works", "worked", "employees", "employee", "staff", "people", "folks",
+                    "someone", "anyone", "who", "team", "members"}
+PEOPLE = r"(?:people|someone|somebody|anyone|anybody|folks|employees?|staff|colleagues|guys|ppl)"
+# "people with ESRI working", "someone working with ESRI", "people who work at ESRI" -> "someone at ESRI"
+PEOPLE_AT_RES = [
+    re.compile(rf"\b{PEOPLE}\s+(?:who\s+)?(?:are\s+)?(?:works?|working|employed)\s+(?:at|in|with|for)\s+", re.I),
+    re.compile(rf"\b{PEOPLE}\s+(?:with|from)\s+([A-Z0-9][\w&.\-]*(?:\s+[A-Z][\w&.\-]*)?)\s+(?:working|employed)\b", re.I),
+]
+# "ESRI employees", "Swiggy folks" right after an intro verb -> "someone at ESRI"
+COMPANY_PEOPLE_RE = re.compile(r"\b(to|with|meet|reach)\s+(?:the\s+)?([A-Z0-9][\w&.\-]*(?:\s+[A-Z][\w&.\-]*)?)\s+"
+                               r"(?:employees|staff|folks|people|team members|team)\b")
 NAME_WORD_RE = re.compile(r"[^\W\d_]+(?:['\-.][^\W\d_]*)*\.?")
 HONORIFIC_RE = re.compile(r"^(?:dr|mr|mrs|ms|prof|shri|smt)\.?\s+", re.I)
 DOMAIN_RE = re.compile(r"\b([a-z0-9\-]+\.(?:com|io|ai|in|co|org|net|app|dev|tech))\b", re.I)
@@ -131,6 +142,7 @@ def parse_rules(text: str) -> TargetSpec:
     t = COMPANY_URL_RE.sub(" ", t)
     t = WEB_URL_RE.sub(lambda m: m.group(1), t)     # "https://swiggy.com/careers" -> "swiggy.com"
     t = _normalise(t)
+    t = _people_at(t)
     low = t.lower()
 
     for alias, canon in SCHOOL_ALIASES.items():
@@ -274,6 +286,9 @@ def _set_role_or_name(spec: TargetSpec, segment: str, had_verb: bool) -> None:
     s = segment.strip(" ,.!?:;-")
     s = re.sub(r"^(?:(?:get|me|a|warm|intro|introduction|can|you|someone|need|looking|for|please)\s+)+", "", s,
                flags=re.I) if not had_verb else s
+    if not spec.company and (m := re.match(r"(.+?)\s+(?:with|for)\s+([A-Z0-9][\w&.\-]*(?:\s+[A-Z][\w&.\-]*)?)$", s)) \
+            and ROLE_RE.search(m.group(1)) and not ROLE_RE.fullmatch(m.group(2)) and not _is_school(m.group(2)):
+        spec.company, s = m.group(2), m.group(1)
     s = _head_of(s)
     s = FILLER_RE.sub("", s).strip()
     s = TRAIL_FILLER_RE.sub("", s).strip(" ,.!?")
@@ -287,13 +302,21 @@ def _set_role_or_name(spec: TargetSpec, segment: str, had_verb: bool) -> None:
     if ROLE_RE.search(s):
         spec.role = " ".join(ROLE_ABBR.get(w.lower(), w) for w in s.split())
     elif had_verb and len(s.split()) <= 3 and all(NAME_WORD_RE.fullmatch(w) for w in s.split()) \
-            and not _is_school(s) and s.lower() not in NETWORK_FILLER and not set(s.lower().split()) & PREPS:
+            and not _is_school(s) and s.lower() not in NETWORK_FILLER and not set(s.lower().split()) & NOT_NAME:
         spec.person_name = HONORIFIC_RE.sub("", s) or s     # any script: "José Álvarez", "李明"
 
 
 SENIOR_RE = re.compile(r"\b(head|vp|svp|evp|director|chief|c[a-z]o|founder|co-?founder|manager|president|principal|"
                        r"partner|owner|gm)\b", re.I)
 PERSON_NOUN = r"(?:guy|girl|gal|lady|person|wala|vala|waala|boss|lead|man|woman|dude|in-?charge)"
+
+
+def _people_at(t: str) -> str:
+    """Normalise 'people working at/with X' style phrasings to 'someone at X' so the company is found."""
+    t = PEOPLE_AT_RES[0].sub("someone at ", t)
+    t = PEOPLE_AT_RES[1].sub(lambda m: f"someone at {m.group(1)}", t)
+    t = COMPANY_PEOPLE_RE.sub(lambda m: f"{m.group(1)} someone at {m.group(2)}", t)
+    return t
 
 
 def _head_of(s: str) -> str:
