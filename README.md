@@ -157,7 +157,7 @@ restores.
 
 ## Testing
 ```bash
-uv run --with pytest pytest -q tests          # 45 tests, no network, no API keys needed
+uv run --with pytest pytest -q tests          # whole suite runs offline, no API keys needed
 uv run python -m eval.cofounder_eval          # live co-founder eval (~4-6 credits per startup)
 uv run python -m eval.cofounder_eval --offline   # re-score saved data, 0 credits
 ```
