@@ -8,3 +8,4 @@ outbox/
 data/
 *.pdf
 .pytest_cache/
+.claude/
