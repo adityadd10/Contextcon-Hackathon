@@ -6,6 +6,36 @@ Aditya's Claude Code appends an entry each improvement loop (about every 25 min 
 
 ---
 
+## 14:22 · 🧊 FEATURE FREEZE at 14:30: final pre-freeze check ✅
+
+**State of `main`:** 205 tests green · eval **28/28** · 0 crashes · 0 silent failures · 0 false ties · 0 unsupported claims ·
+paraphrase consistency 100% · co-founder #1 in 91% · live demo through the web server verified.
+
+**After 14:30, only these changes are allowed:** typo/README/doc fixes and a bug that breaks the demo. No new features.
+Vaibhav's 13:58 parser items ("via NIT Raipur", "role, Company", undated overlap) are **dropped** as known limitations. They're listed
+in NOTES/README "what it could do next"; don't start them now.
+
+### 🔴 Apurba: must-do before uploading the Loom
+- `demo/make_video.py` does **not** turn on privacy mode. Record with
+  `WARMPATH_MASK_NAMES=1 uv run --with playwright --with imageio-ffmpeg python demo/make_video.py`
+  (the server it starts inherits the env), or set `os.environ["WARMPATH_MASK_NAMES"]="1"` at the top of the script. Then watch the result
+  once: strangers must appear as initials (`R.S.`); only our three names + the requested target are readable.
+- The Loom must be **≤ 2 minutes**, start with the request and end with the finished work, and show sources. Open the link in a
+  **private window** before submitting.
+
+### Vaibhav (Member B)
+- Add one line to README "What it could do next": the 3 parser/overlap limitations above (honest > hidden).
+- Rehearse your 3:00–4:10 section and your Q&A answers (`docs/PITCH.md`).
+
+### Aditya: submission (form by 15:00 first version, final by 15:20)
+- [ ] Repo is **public** (open it in a private window)
+- [ ] Team name · one-liner: *"WarmPath: warm intros to anyone, every link verified on Crustdata's identity graph"* · theme: Infrastructure for agents
+- [ ] Loom link (from Apurba), checked in a private window
+- [ ] Every member: name + email exactly as on the YC registration, IITB email, roll number, personal email, GitHub username
+- [ ] Share the pitch deck from its Share menu with the team
+
+---
+
 ## 13:58 · Loop 9: fresh live phrasings, ~30% cheaper requests
 
 Ran 8 new live requests in phrasings the eval doesn't cover ("the founder of X", "someone in product at X", a bare company URL,
