@@ -56,3 +56,17 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
   (`mcp.server.mcpserver`) → wrote mcp_server.py against 2.x. Tools: find_warm_paths, explain_tie, graph_path.
 - 11:53 · Apurba · found: "teh data guy at swiggy pls" resolves no target (parser misses the lowercase company), so this is
   already on Vaibhav's list in UPDATES.md. It's the robustness shot in the video, so it needs fixing before recording.
+- 12:19 · Apurba · worst-case pass on server/UI/CLI/MCP, with 26 new tests in `tests/test_product.py` (new file, offline). Streams
+  never fail with a bare HTTP error: empty, huge or garbage queries, a missing key, a pipeline crash, a hung run (timeout
+  `WARMPATH_RUN_TIMEOUT`, default 240 s), a missing or corrupt replay file and bad crawl seeds all arrive as `error` + `end` events
+  with a fix-it message. Concurrent runs are queued (one paid run at a time, shared SQLite), and the waiting run is told why.
+  SSE heartbeats every 15 s keep quiet rate-limited runs alive.
+- 12:19 · Apurba · found by the tests: the same seed profile written two ways (`linkedin.com/in/a` vs `https://www.linkedin.com/in/a/`)
+  was enriched twice and so paid for twice → seeds are now normalised and deduplicated.
+- 12:19 · Apurba · UI worst cases, checked in headless Chromium: the vis-network CDN blocked (venue Wi-Fi) → paths, drafts and audit
+  still work, with a notice in place of the graph. EventSource auto-reconnect would silently re-run (and re-bill) the pipeline →
+  disabled. Double-click starts only one run. A lost server says "run stopped" instead of spinning forever. Empty graph, unknown
+  people and non-numeric ids all give readable messages. CLI: Ctrl-C, piped stdin, bad flags and Crustdata text containing rich
+  markup (`[bold]`) are handled, with exit codes 0/1/2/130.
+- 12:19 · Apurba · for Aditya: `pipeline.run` returns before emitting `done` when the target can't be resolved (the `return`
+  inside `try` skips the final emit). The UI now handles a clean end with no `done`, but CLI/MCP callers get no `done` event.

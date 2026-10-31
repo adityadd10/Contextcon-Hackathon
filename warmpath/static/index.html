@@ -122,6 +122,12 @@ label.toggle{display:flex;gap:6px;align-items:center;color:var(--muted);font-siz
 .cite.crustdata{border-color:#2d3a7a;color:#aab4ff}
 .cite.web{border-color:#5a3d7a;color:#d0b4ff}
 .cite.derived{border-color:var(--line2)}
+button.cite{cursor:pointer;font-family:var(--mono)}
+button.cite.call{border-color:#1f5a40;color:var(--ok);background:none}
+button.cite.call:hover{background:#10291d}
+.verified{font-size:12px;color:var(--ok);margin:-4px 0 8px}
+tr.hl td{background:#10291d;transition:background .3s}
+tr.err td{background:#1e1012}
 a.cite:hover{text-decoration:none;border-color:var(--accent);color:var(--text)}
 .collapsed .tie{display:none}
 
@@ -212,6 +218,7 @@ select,.side input{width:100%;background:var(--panel2);border:1px solid var(--li
         <div class="hd"><h3>Path graph</h3>
           <div class="legend"><span><i style="background:var(--seed)"></i>your team</span><span><i style="background:var(--conn)"></i>connector</span><span><i style="background:var(--target)"></i>target</span><span>edge width = tie strength · click an edge for evidence</span></div>
         </div>
+        <div id="runGraphMsg" class="empty hide"></div>
         <div id="runGraph"></div>
         <div id="runEdge" class="bd hide" style="border-top:1px solid var(--line)"></div>
       </div>
@@ -238,6 +245,7 @@ select,.side input{width:100%;background:var(--panel2);border:1px solid var(--li
         <span class="legend" style="margin:0"><span><i style="background:var(--conn)"></i>person</span><span><i style="background:#c08a3e;border-radius:2px"></i>company</span><span><i style="background:#4fb3c9;border-radius:2px"></i>school</span></span>
         <button class="btn" id="gAll">Whole graph</button>
       </div>
+      <div id="graphMsg" class="empty hide"></div>
       <div id="graphNet"></div>
     </div>
     <div class="side">
@@ -277,6 +285,32 @@ const safeUrl = u => /^https?:\/\//i.test(u || "") ? u : null;
 const COLORS = {target:"#ff7a6b", connector:"#7c8cff", seed:"#3ecf8e", company:"#c08a3e", school:"#4fb3c9"};
 const scoreColor = s => s >= 70 ? "#3ecf8e" : s >= 45 ? "#7c8cff" : "#f5b941";
 const tieKey = (a, b) => [a, b].sort((x, y) => x - y).join("-");
+const num = (v, d = 1) => Number.isFinite(Number(v)) ? Number(v).toFixed(d) : "–";
+const arr = v => Array.isArray(v) ? v : [];
+const MAX_Q = 1000;
+async function getJSON(url) {        // fetch that turns server errors and dead servers into readable messages
+  let r;
+  try { r = await fetch(url); } catch { throw new Error("Server unreachable. Is `warmpath serve` running?"); }
+  const body = await r.json().catch(() => null);
+  if (!r.ok) throw new Error(body?.error || body?.detail || `HTTP ${r.status}`);
+  return body;
+}
+/* If the CDN is blocked (venue Wi-Fi, offline), keep the app working without the graph canvases. */
+const HAS_VIS = typeof vis !== "undefined";
+class MiniSet {                       // the subset of vis.DataSet we use
+  constructor() { this.m = new Map(); }
+  get(id) { return id === undefined ? [...this.m.values()] : this.m.get(id) || null; }
+  update(o) { this.m.set(o.id, {...(this.m.get(o.id) || {}), ...o}); }
+  add(list) { list.forEach(o => this.m.set(o.id, o)); }
+  clear() { this.m.clear(); }
+}
+const NoNet = {on() {}, fit() {}, selectNodes() {}, focus() {}, setOptions() {}};
+function makeNet(el, msgEl, data, opts) {
+  if (HAS_VIS) return new vis.Network(el, data, opts);
+  el.classList.add("hide"); msgEl.classList.remove("hide");
+  msgEl.textContent = "Graph view unavailable: the vis-network library could not load (no internet?). Paths, evidence, drafts and the audit trail still work.";
+  return NoNet;
+}
 
 /* ------------------------------------------------------------ tabs */
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
@@ -294,17 +328,17 @@ document.querySelectorAll("#rtabs button").forEach(b => b.onclick = () => {
 /* ------------------------------------------------------------ status */
 async function refreshStatus() {
   try {
-    const h = await (await fetch("/api/health")).json();
+    const h = await getJSON("/api/health");
     const m = $("#mode");
     if (h.fake) { m.textContent = "offline fake world"; m.className = "badge fake"; }
     else if (h.live_key) { m.textContent = "live · Crustdata"; m.className = "badge live"; }
     else { m.textContent = "no API key · use replay"; m.className = "badge fake"; $("#mock").checked = true; }
-  } catch { $("#mode").textContent = "server offline"; }
+  } catch { $("#mode").textContent = "server offline"; $("#mode").className = "badge fake"; }
   refreshGraphStat();
 }
 async function refreshGraphStat() {
   try {
-    const s = await (await fetch("/api/graph/stats")).json();
+    const s = await getJSON("/api/graph/stats");
     $("#gstat").textContent = `graph: ${s.people} people · ${s.relationships} relationships`;
     return s;
   } catch { return null; }
@@ -315,24 +349,27 @@ function citeHtml(ev) {
   const url = safeUrl(ev.url);
   const txt = `${ev.kind === "web" ? "web" : ev.endpoint} · ${ev.ref}`;
   const title = esc(`${ev.claim}\n${ev.endpoint} ${ev.ref}${ev.call_id ? " · call " + ev.call_id : ""}`);
-  return url ? `<a class="cite ${esc(ev.kind)}" href="${esc(url)}" target="_blank" rel="noopener" title="${title}">${esc(txt)} ↗</a>`
-             : `<span class="cite ${esc(ev.kind)}" title="${title}">${esc(txt)}</span>`;
+  const call = ev.call_id ? `<button class="cite call" data-call="${esc(ev.call_id)}" title="Show call ${esc(ev.call_id)} in the audit trail">audit ${esc(ev.call_id)}</button>` : "";
+  return (url ? `<a class="cite ${esc(ev.kind)}" href="${esc(url)}" target="_blank" rel="noopener" title="${title}">${esc(txt)} ↗</a>`
+              : `<span class="cite ${esc(ev.kind)}" title="${title}">${esc(txt)}</span>`) + call;
 }
 function tieHtml(t) {
-  const facs = (t.factors || []).map(f => `
-    <div class="factor"><div class="c">+${Number(f.contribution).toFixed(1)}</div>
+  const facs = arr(t.factors).map(f => `
+    <div class="factor"><div class="c">+${num(f.contribution)}</div>
       <div><div class="e">${esc(f.explanation)}</div>
-      ${(f.evidence || []).length ? `<div class="cites">${f.evidence.map(citeHtml).join("")}</div>` : ""}</div></div>`).join("");
-  return `<div class="tie"><div class="th"><b>${esc(t.a?.name)} ↔ ${esc(t.b?.name)}</b>
-      <span class="pill">${esc(t.kind)}</span><span class="pts">${Number(t.score).toFixed(1)}/100</span></div>${facs ||
+      ${arr(f.evidence).length ? `<div class="cites">${f.evidence.map(citeHtml).join("")}</div>` : ""}</div></div>`).join("");
+  return `<div class="tie"><div class="th"><b>${esc(t.a?.name || "?")} ↔ ${esc(t.b?.name || "?")}</b>
+      ${t.verified ? `<span class="pill ok" title="${esc(t.verification)}">✓ Verified</span>` : ""}
+      <span class="pill">${esc(t.kind)}</span><span class="pts">${num(t.score)}/100</span></div>
+      ${t.verified && t.verification ? `<div class="verified">${esc(t.verification)}</div>` : ""}${facs ||
       '<div class="hint">No factors recorded.</div>'}</div>`;
 }
 
 /* ------------------------------------------------------------ run graph */
 let runNodes, runEdges, runNet;
 function initRunGraph() {
-  runNodes = new vis.DataSet(); runEdges = new vis.DataSet();
-  runNet = new vis.Network($("#runGraph"), {nodes: runNodes, edges: runEdges}, {
+  runNodes = HAS_VIS ? new vis.DataSet() : new MiniSet(); runEdges = HAS_VIS ? new vis.DataSet() : new MiniSet();
+  runNet = makeNet($("#runGraph"), $("#runGraphMsg"), {nodes: runNodes, edges: runEdges}, {
     nodes: {shape: "dot", font: {color: "#e7e9ee", size: 13, face: "Inter, sans-serif", multi: "html"}, borderWidth: 2},
     edges: {color: {color: "#3a4157", highlight: "#a78bfa", hover: "#a78bfa"}, font: {color: "#8b93a7", size: 11, strokeWidth: 0, align: "top"},
             smooth: {type: "continuous"}, hoverWidth: 1.5},
@@ -344,28 +381,29 @@ function initRunGraph() {
 }
 const roleRank = {target: 3, seed: 2, connector: 1};
 function addRunNode(role, p) {
-  if (p.person_id == null) return;
+  if (!p || p.person_id == null || !COLORS[role]) return;
   const old = runNodes.get(p.person_id);
   if (old && roleRank[old.role] >= roleRank[role]) return;
   const c = COLORS[role];
   runNodes.update({id: p.person_id, role,
-    label: `<b>${esc(p.name)}</b>\n${esc((p.current_title || p.headline || "").slice(0, 34))}`,
-    title: `${p.name}${p.current_title ? " · " + p.current_title : ""}`,
+    label: `<b>${esc(p.name || "(name hidden)")}</b>\n${esc((p.current_title || p.headline || "").slice(0, 34))}`,
+    title: `${p.name || "(name hidden)"}${p.current_title ? " · " + p.current_title : ""}`,
     size: role === "target" ? 26 : role === "seed" ? 18 : 20,
     color: {background: c, border: c, highlight: {background: c, border: "#fff"}, hover: {background: c, border: "#fff"}}});
 }
 function addRunEdge(e) {
-  if (e.a == null || e.b == null) return;
+  if (e.a == null || e.b == null || e.a === e.b) return;
+  e.score = Number.isFinite(Number(e.score)) ? Math.max(0, Math.min(100, Number(e.score))) : 0;
   const id = tieKey(e.a, e.b), old = runEdges.get(id);
-  const label = old && e.label === "web co-mention" ? `${old.baseLabel} + web` : e.label;
+  const label = old && e.label === "web co-mention" ? `${old.baseLabel} + web` : String(e.label || "tie");
   runEdges.update({id, from: e.a, to: e.b, score: e.score, baseLabel: old?.baseLabel || e.label,
     label: `${Math.round(e.score)} · ${label.split(" · ")[0]}`, title: `${Math.round(e.score)}/100 · ${label}`,
     width: 1 + e.score / 14, color: {color: scoreColor(e.score), opacity: .75, inherit: false}});
 }
 function showRunEdge(id) {
   const box = $("#runEdge"); box.classList.remove("hide");
-  for (const p of state.paths) for (const t of p.ties)
-    if (tieKey(t.a.person_id, t.b.person_id) === id) { box.innerHTML = tieHtml(t); return; }
+  for (const p of state.paths) for (const t of arr(p.ties))
+    if (t.a && t.b && tieKey(t.a.person_id, t.b.person_id) === id) { box.innerHTML = tieHtml(t); return; }
   const e = runEdges.get(id);
   box.innerHTML = `<div class="hint">${esc(e?.label)} · evidence arrives with the scored paths.</div>`;
 }
@@ -373,7 +411,7 @@ function showRunEdge(id) {
 /* ------------------------------------------------------------ run state + events */
 let state, es, timer;
 function reset() {
-  state = {steps: {}, paths: [], drafts: [], audit: [], t0: Date.now()};
+  state = {steps: {}, paths: [], drafts: [], audit: [], t0: Date.now(), done: false, errors: 0};
   $("#steps").innerHTML = ""; $("#warns").innerHTML = ""; $("#summary").innerHTML = "";
   $("#r-paths").innerHTML = '<div class="empty">Working…</div>'; $("#r-drafts").innerHTML = '<div class="empty">Drafts appear after scoring.</div>';
   $("#nPaths").textContent = "0"; $("#nDrafts").textContent = "0"; $("#runEdge").classList.add("hide");
@@ -406,36 +444,43 @@ function addWarning(msg, isErr) {
   d.className = "warn" + (isErr ? " e" : "");
   d.innerHTML = `<span>${isErr ? "✕" : "⚠"}</span><span>${esc(msg)}</span>`;
   $("#warns").appendChild(d);
+  if (isErr) state.errors++;
   const open = Object.values(state.steps).pop();   // also pin it under the step it happened in
   if (open) { const s = document.createElement("li"); s.className = "w"; s.textContent = "⚠ " + msg; open.querySelector(".subs").appendChild(s); }
 }
 function renderPaths() {
   const box = $("#r-paths");
   $("#nPaths").textContent = state.paths.length;
-  if (!state.paths.length) { box.innerHTML = '<div class="empty">No paths yet.</div>'; return; }
+  if (!state.paths.length) { box.innerHTML = `<div class="empty">${state.done ? noPathAdvice() : "No paths yet."}</div>`; return; }
   const seedIds = new Set(runNodes.get().filter(n => n.role === "seed").map(n => n.id));
-  box.innerHTML = state.paths.sort((a, b) => a.rank - b.rank).map((p, i) => {
+  box.innerHTML = state.paths.sort((a, b) => (a.rank || 99) - (b.rank || 99)).map((p, i) => {
+    p.nodes = arr(p.nodes); p.ties = arr(p.ties);
     const last = p.nodes.length - 1;
-    const chain = p.nodes.map((n, j) => `<span class="who ${j === last ? "t" : seedIds.has(n.person_id) ? "s" : ""}">${esc(n.name)}</span>`)
+    const chain = p.nodes.map((n, j) => `<span class="who ${j === last ? "t" : seedIds.has(n.person_id) ? "s" : ""}">${esc(n.name || "?")}</span>`)
                          .join('<span class="arrow">→</span>');
-    const s = Math.round(p.score);
+    const s = Math.max(0, Math.min(100, Math.round(Number(p.score) || 0)));
     return `<div class="path ${i ? "collapsed" : ""}">
       <div class="top" onclick="this.parentNode.classList.toggle('collapsed')">
-        <div class="rank">#${p.rank}</div>
+        <div class="rank">#${esc(p.rank ?? i + 1)}</div>
         <div class="score" style="--p:${s};--c:${scoreColor(s)}"><span>${s}</span></div>
-        <div style="min-width:0"><div class="chain">${chain}</div><div class="why">${esc(p.why)}</div></div>
+        <div style="min-width:0;flex:1"><div class="chain">${chain}</div><div class="why">${esc(p.why)}</div></div>
+        ${p.ties.length && p.ties.every(t => t.verified) ? '<span class="pill ok" title="Every tie re-checked against full Crustdata profiles">✓ Verified</span>' : ""}
       </div>${p.ties.map(tieHtml).join("")}</div>`;
   }).join("");
+}
+function noPathAdvice() {
+  if (!state.target) return "WarmPath couldn't pin down who you mean. Add the company name or paste their profile URL.";
+  return "No warm path found yet. Try widening the network (drop the school filter), add your team's profiles as seeds, or crawl your network in the Social graph tab.";
 }
 function renderDrafts() {
   const box = $("#r-drafts");
   $("#nDrafts").textContent = state.drafts.length;
   box.innerHTML = state.drafts.map(d => {
-    const bad = d.claims_unsupported || [];
+    const bad = arr(d.claims_unsupported);
     return `<div class="draft"><div class="dh"><b>To ${esc(d.to)}</b><span class="hint" style="margin:0">${esc(d.subject)}</span>
       <span class="spacer" style="flex:1"></span>
-      <span class="pill ${bad.length ? "bad" : "ok"}">${bad.length ? `✕ ${bad.length} unsupported` : `✓ ${d.claims_checked} claims cited`}</span>
-      <span class="pill">path #${d.path_rank} · saved to outbox/, not sent</span></div>
+      <span class="pill ${bad.length ? "bad" : "ok"}">${bad.length ? `✕ ${bad.length} unsupported` : `✓ ${esc(d.claims_checked ?? 0)} claims cited`}</span>
+      <span class="pill">path #${esc(d.path_rank)} · saved to outbox/, not sent</span></div>
       <pre>${esc(d.body)}</pre>
       <div class="blurb"><h4>Forwardable blurb</h4><pre>${esc(d.forwardable_blurb)}</pre></div>
       ${bad.length ? `<div class="bd bad" style="padding-top:0">Unsupported: ${bad.map(esc).join(" · ")}</div>` : ""}</div>`;
@@ -446,17 +491,18 @@ function renderSummary(r) {
   $("#summary").innerHTML = [
     t && [esc(t.name), `target · ${esc(t.current_title || "")}${co ? " @ " + esc(co.name) : ""}`],
     [r.paths.length, "warm paths"],
-    [r.paths[0] ? Math.round(r.paths[0].score) + "/100" : "–", "best path"],
+    [r.paths[0] ? num(r.paths[0].score, 0) + "/100" : "–", "best path"],
     [r.audit.length, "API calls"],
-    [r.credits_used, "credits used"],
-    [r.elapsed_s + "s", "end to end"],
+    [num(r.credits_used, 2), "credits used"],
+    [num(r.elapsed_s) + "s", "end to end"],
   ].filter(Boolean).map(([b, s]) => `<div class="stat"><b>${b}</b><span>${s}</span></div>`).join("");
 }
 function renderAudit(audit, credits) {
-  $("#auditSum").textContent = `${audit.length} calls · ${credits} credits`;
+  audit = arr(audit);
+  $("#auditSum").textContent = `${audit.length} calls · ${num(credits, 2)} credits`;
   $("#auditBtn").textContent = `Audit trail · ${audit.length}`;
   $("#auditBody").innerHTML = audit.length ? `<table><thead><tr><th>call</th><th>endpoint</th><th>status</th><th>credits</th><th>response sha256</th></tr></thead><tbody>${
-    audit.map(c => `<tr><td class="m">${esc(c.call_id)}</td>
+    audit.map(c => `<tr id="call-${esc(c.call_id)}" class="${c.error ? "err" : ""}"><td class="m">${esc(c.call_id)}</td>
       <td>${esc(c.endpoint)}${c.cached ? ' <span class="pill">cached</span>' : ""}
         <details><summary>request</summary><pre>${esc(JSON.stringify(c.request, null, 1))}</pre></details></td>
       <td class="${c.status < 400 ? "ok" : "bad"}">${esc(c.status)}${c.error ? "<br>" + esc(c.error) : ""}</td>
@@ -465,44 +511,71 @@ function renderAudit(audit, credits) {
 }
 function handle(e) {
   switch (e.type) {
-    case "step": onStep(e); break;
-    case "node": addRunNode(e.role, e.person); break;
+    case "step": if (e.id) onStep(e); break;
+    case "node": addRunNode(e.role, e.person); state.target = e.role === "target" ? e.person : state.target; break;
     case "edge": addRunEdge(e); break;
     case "warning": addWarning(e.message); break;
     case "error": addWarning(e.message, true); break;
-    case "graph": $("#gstat").textContent = `graph: ${e.stats.people} people · ${e.stats.relationships} relationships`; break;
-    case "path": state.paths = state.paths.filter(p => p.rank !== e.path.rank).concat(e.path); renderPaths(); break;
-    case "draft": state.drafts.push(e.draft); renderDrafts(); break;
+    case "graph": if (e.stats) $("#gstat").textContent = `graph: ${e.stats.people} people · ${e.stats.relationships} relationships`; break;
+    case "path": if (!e.path) break; state.paths = state.paths.filter(p => p.rank !== e.path.rank).concat(e.path); renderPaths(); break;
+    case "draft": if (!e.draft) break; state.drafts.push(e.draft); renderDrafts(); break;
     case "done": {
-      const r = e.result;
-      state.paths = r.paths; renderPaths(); renderSummary(r); renderAudit(r.audit, r.credits_used);
-      (r.warnings || []).forEach(w => { if (![...$("#warns").children].some(d => d.textContent.includes(w))) addWarning(w); });
+      const r = e.result || {};
+      r.paths = arr(r.paths); r.audit = arr(r.audit);
+      state.done = true; state.target = r.target;
+      if (r.paths.length || !state.paths.length) state.paths = r.paths;
+      renderPaths(); renderSummary(r); renderAudit(r.audit, r.credits_used);
+      arr(r.warnings).forEach(w => { if (![...$("#warns").children].some(d => d.textContent.includes(w))) addWarning(w); });
       runNet.fit({animation: true});
       break;
     }
-    case "end": finish(); break;
+    case "end": finish(true); break;
   }
 }
-function finish() {
+function finish(clean) {
   if (es) es.close(); es = null;
   clearInterval(timer); $("#go").disabled = false;
   $("#elapsed").textContent = ((Date.now() - state.t0) / 1000).toFixed(1) + "s · done";
   Object.values(state.steps).forEach(li => { if (li.classList.contains("start")) li.className = "step error"; });
+  const unresolved = state.steps.resolve?.classList.contains("error");
+  if (!state.done && clean && !state.errors && unresolved) {   // pipeline stops early when the target can't be resolved
+    state.done = true; renderPaths(); $("#summary").innerHTML = "";
+  } else if (!state.done) {          // stream ended early: say so instead of leaving "Working…"
+    $("#r-paths").innerHTML = `<div class="empty">The run stopped before finishing${state.errors ? " (see the error above)" : ""}. ` +
+      `Anything already found is shown above; try again, or switch on offline replay.</div>`;
+  } else if (!state.paths.length) renderPaths();
 }
 function start(q) {
   const mock = $("#mock").checked;
-  if (!q && !mock) { $("#q").focus(); return; }
-  if (es) es.close();
+  q = (q || "").replace(/\s+/g, " ").trim();
+  if (es) return;                    // a run is already streaming: never start a second paid run by double-clicking
+  if (!q && !mock) { $("#q").focus(); $("#q").placeholder = "Type who you want to reach first…"; return; }
+  if (q.length > MAX_Q) { q = q.slice(0, MAX_Q); $("#q").value = q; }
   reset(); $("#go").disabled = true;
+  if (!navigator.onLine && !mock) addWarning("Your browser reports no network. Crustdata calls will fail; try offline replay.");
   es = new EventSource(mock ? "/api/run?mock=1" : "/api/run?q=" + encodeURIComponent(q));
-  es.onmessage = m => handle(JSON.parse(m.data));
-  es.onerror = () => { if (es) { addWarning("Connection to the server closed.", true); finish(); } };
+  es.onmessage = m => {
+    let e;
+    try { e = JSON.parse(m.data); } catch { return; }          // skip a garbled frame, keep the run going
+    try { handle(e); } catch (err) { console.error("bad event", e, err); }
+  };
+  // EventSource reconnects on its own, which would silently re-run (and re-bill) the pipeline. Never allow that.
+  es.onerror = () => { if (es) { addWarning("Lost the connection to the server. The run was stopped.", true); finish(); } };
 }
+window.addEventListener("offline", () => { if (es) addWarning("Network connection lost."); });
 $("#askForm").onsubmit = ev => { ev.preventDefault(); start($("#q").value.trim()); };
 $("#chips").querySelectorAll(".chip").forEach(c => c.onclick = () => { $("#q").value = c.textContent; start(c.textContent); });
 
 /* ------------------------------------------------------------ audit drawer */
 const drawer = open => { $("#drawer").classList.toggle("open", open); $("#scrim").classList.toggle("open", open); };
+document.addEventListener("click", ev => {          // citation → its Crustdata call in the audit trail
+  const b = ev.target.closest("button[data-call]");
+  if (!b) return;
+  drawer(true);
+  document.querySelectorAll("#auditBody tr.hl").forEach(r => r.classList.remove("hl"));
+  const row = document.getElementById("call-" + b.dataset.call);
+  if (row) { row.classList.add("hl"); row.querySelector("details")?.setAttribute("open", ""); row.scrollIntoView({block: "center", behavior: "smooth"}); }
+});
 $("#auditBtn").onclick = () => drawer(true);
 $("#auditClose").onclick = $("#scrim").onclick = () => drawer(false);
 document.addEventListener("keydown", e => { if (e.key === "Escape") drawer(false); });
@@ -510,8 +583,8 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") drawer(false
 /* ------------------------------------------------------------ graph explorer */
 let gNodes, gEdges, gNet, gPeople = [];
 function initGraphNet() {
-  gNodes = new vis.DataSet(); gEdges = new vis.DataSet();
-  gNet = new vis.Network($("#graphNet"), {nodes: gNodes, edges: gEdges}, {
+  gNodes = HAS_VIS ? new vis.DataSet() : new MiniSet(); gEdges = HAS_VIS ? new vis.DataSet() : new MiniSet();
+  gNet = makeNet($("#graphNet"), $("#graphMsg"), {nodes: gNodes, edges: gEdges}, {
     nodes: {font: {color: "#c9cdd8", size: 12}, borderWidth: 1.5},
     edges: {smooth: {type: "continuous"}, hoverWidth: 1.5, selectionWidth: 2},
     physics: {solver: "forceAtlas2Based", forceAtlas2Based: {gravitationalConstant: -60, springLength: 110}, stabilization: {iterations: 200}},
@@ -522,7 +595,10 @@ function initGraphNet() {
     const e = gEdges.get(p.edges[0]);
     if (e?.type === "KNOWS") explainEdge(e.from, e.to);
   });
-  gNet.on("stabilizationIterationsDone", () => gNet.fit());
+  gNet.on("stabilizationIterationsDone", () => {
+    gNet.fit();
+    if (gNodes.get().length > 150) gNet.setOptions({physics: false});   // big graphs: stop the CPU-hungry simulation
+  });
   gNet.on("doubleClick", p => { const n = p.nodes[0]; if (n && String(n).startsWith("person:")) loadGraph(n); });
 }
 const pid = id => Number(String(id).split(":")[1]);
@@ -530,20 +606,30 @@ async function explainEdge(a, b) {
   const box = $("#edgeInfo .bd");
   box.innerHTML = '<div class="hint">Loading evidence…</div>';
   try {
-    const r = await fetch(`/api/graph/tie?a=${pid(a)}&b=${pid(b)}`);
-    if (!r.ok) throw new Error(await r.text());
-    box.innerHTML = tieHtml(await r.json()).replace('class="tie"', 'class="tie" style="border:0;padding:0"');
+    box.innerHTML = tieHtml(await getJSON(`/api/graph/tie?a=${pid(a)}&b=${pid(b)}`)).replace('class="tie"', 'class="tie" style="border:0;padding:0"');
   } catch (err) { box.innerHTML = `<div class="bad">${esc(err.message)}</div>`; }
 }
 async function loadGraph(center) {
   if (!gNet) initGraphNet();
   const url = center ? `/api/graph/subgraph?center=${encodeURIComponent(center)}&depth=2` : "/api/graph/subgraph";
-  const [sg, stats] = await Promise.all([fetch(url).then(r => r.json()), refreshGraphStat()]);
+  let sg, stats;
+  try { [sg, stats] = await Promise.all([getJSON(url), refreshGraphStat()]); }
+  catch (err) {
+    $("#graphMsg").textContent = "Couldn't load the graph: " + err.message; $("#graphMsg").classList.remove("hide");
+    return;
+  }
+  sg.nodes = arr(sg.nodes); sg.edges = arr(sg.edges);
+  const gm = $("#graphMsg");
+  if (HAS_VIS) {
+    gm.classList.toggle("hide", sg.nodes.length > 0);
+    gm.textContent = "The graph is empty. Run a request on the Find a path tab, or crawl your team's network below, and it fills up.";
+  }
   const degree = {};
   sg.edges.filter(e => e.type === "KNOWS").forEach(e => { degree[e.src] = (degree[e.src] || 0) + 1; degree[e.dst] = (degree[e.dst] || 0) + 1; });
   gNodes.clear(); gEdges.clear();
   gNodes.add(sg.nodes.map(n => {
     const c = n.type === "person" ? (n.id === center ? COLORS.target : COLORS.connector) : COLORS[n.type] || "#888";
+    n.label = n.label || n.id;
     return {id: n.id, label: n.label, title: `${n.type}: ${n.label}`, shape: n.type === "person" ? "dot" : "square",
       size: n.type === "person" ? 10 + 3 * Math.min(8, degree[n.id] || 0) : 9,
       color: {background: c, border: c, highlight: {background: c, border: "#fff"}},
@@ -552,13 +638,13 @@ async function loadGraph(center) {
   const ids = new Set(sg.nodes.map(n => n.id));
   gEdges.add(sg.edges.filter(e => ids.has(e.src) && ids.has(e.dst)).map((e, i) => e.type === "KNOWS"
     ? {id: "k" + i, from: e.src, to: e.dst, type: e.type, width: 1 + (e.weight || 0) / 12,
-       color: {color: scoreColor(e.weight || 0), opacity: .85, inherit: false}, title: `KNOWS · ${Math.round(e.weight)}/100 · click for evidence`}
+       color: {color: scoreColor(e.weight || 0), opacity: .85, inherit: false}, title: `KNOWS · ${num(e.weight, 0)}/100 · click for evidence`}
     : {id: "m" + i, from: e.src, to: e.dst, type: e.type, width: .6, dashes: e.type === "STUDIED_AT",
        color: {color: "#3a4157", opacity: .7, inherit: false}, title: `${e.type}${e.props?.title ? " · " + e.props.title : ""}`}));
   if (stats) $("#gSummary").innerHTML = [[stats.people, "people"], [stats.relationships, "verified relationships"],
     [stats.nodes?.company || 0, "companies"], [stats.nodes?.school || 0, "schools"]]
     .map(([b, s]) => `<div class="stat" style="min-width:0;flex:1"><b>${b}</b><span>${s}</span></div>`).join("");
-  gPeople = sg.nodes.filter(n => n.type === "person").sort((a, b) => a.label.localeCompare(b.label));
+  gPeople = sg.nodes.filter(n => n.type === "person").sort((a, b) => String(a.label).localeCompare(String(b.label)));
   if (!center) {
     const opts = gPeople.map(n => `<option value="${pid(n.id)}">${esc(n.label)} (#${pid(n.id)})</option>`).join("");
     const [a, b] = [$("#pA").value, $("#pB").value];
@@ -569,9 +655,11 @@ async function loadGraph(center) {
   loadBrokers();
 }
 async function loadBrokers() {
-  const rows = await fetch("/api/graph/brokers").then(r => r.json()).catch(() => []);
+  let rows;
+  try { rows = arr(await getJSON("/api/graph/brokers")); }
+  catch (err) { $("#brokers").innerHTML = `<div class="bad">${esc(err.message)}</div>`; return; }
   $("#brokers").innerHTML = rows.length ? rows.map(r =>
-    `<div class="broker" data-id="${esc(r.id)}">${esc(r.name)}<span>${r.betweenness.toFixed(3)} · ${r.degree} ties</span></div>`).join("")
+    `<div class="broker" data-id="${esc(r.id)}">${esc(r.name || r.id)}<span>${num(r.betweenness, 3)} · ${esc(r.degree)} ties</span></div>`).join("")
     : '<div class="empty" style="padding:12px">No relationships yet. Run a query or crawl.</div>';
   $("#brokers").querySelectorAll(".broker").forEach(d => d.onclick = () => { gNet.selectNodes([d.dataset.id]); gNet.focus(d.dataset.id, {scale: 1.2, animation: true}); });
 }
@@ -579,8 +667,11 @@ $("#gAll").onclick = () => loadGraph();
 $("#pGo").onclick = async () => {
   const a = $("#pA").value, b = $("#pB").value, out = $("#pOut");
   if (!a || !b || a === b) { out.innerHTML = '<div class="hint">Pick two different people.</div>'; return; }
-  const r = await fetch(`/api/graph/path?a=${a}&b=${b}&max_hops=6`).then(r => r.json());
-  if (!r.found) { out.innerHTML = '<div class="hint">No chain in the graph yet. Crawl more of the network.</div>'; return; }
+  let r;
+  out.innerHTML = '<div class="hint">Searching…</div>';
+  try { r = await getJSON(`/api/graph/path?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}&max_hops=6`); }
+  catch (err) { out.innerHTML = `<div class="bad">${esc(err.message)}</div>`; return; }
+  if (!r.found) { out.innerHTML = `<div class="hint">No chain: ${esc(r.reason || "not connected yet")}. Crawl more of the network to connect them.</div>`; return; }
   const nodeIds = r.ids.map(i => "person:" + i);
   gNet.selectNodes(nodeIds); gNet.fit({nodes: nodeIds, animation: true});
   out.innerHTML = `<div class="chain" style="margin:12px 0 4px">${r.people.map(p => `<span class="who">${esc(p.name)}</span>`).join('<span class="arrow">→</span>')}</div>
@@ -589,7 +680,7 @@ $("#pGo").onclick = async () => {
 };
 let crawlES;
 $("#crawlGo").onclick = () => {
-  if (crawlES) crawlES.close();
+  if (crawlES) return;               // one crawl at a time
   const log = $("#crawlLog"); log.innerHTML = "";
   const line = (t, cls) => { const d = document.createElement("div"); d.textContent = t; if (cls) d.className = cls; log.appendChild(d); log.scrollTop = 1e9; };
   const qs = new URLSearchParams({seeds: $("#seeds").value.trim(), depth: $("#depth").value});
@@ -597,14 +688,14 @@ $("#crawlGo").onclick = () => {
   let pending;
   crawlES = new EventSource("/api/crawl?" + qs);
   crawlES.onmessage = m => {
-    const e = JSON.parse(m.data);
+    let e; try { e = JSON.parse(m.data); } catch { return; }
     if (e.type === "step") { line(`${e.status === "done" ? "✓" : "·"} ${e.label}${e.detail ? " · " + e.detail : ""}`); clearTimeout(pending); pending = setTimeout(() => loadGraph(), 400); }
-    else if (e.type === "node") line(`+ seed ${e.person.name}`);
+    else if (e.type === "node") line(`+ seed ${e.person?.name || "?"}`);
     else if (e.type === "warning") line("⚠ " + e.message, "bad");
     else if (e.type === "error") line("✕ " + e.message, "bad");
     else if (e.type === "end") { crawlES.close(); crawlES = null; $("#crawlGo").disabled = false; loadGraph(); }
   };
-  crawlES.onerror = () => { if (crawlES) { line("✕ connection closed (is a seed URL or API key missing?)", "bad"); crawlES.close(); crawlES = null; $("#crawlGo").disabled = false; } };
+  crawlES.onerror = () => { if (crawlES) { line("✕ lost the connection to the server; the crawl was stopped", "bad"); crawlES.close(); crawlES = null; $("#crawlGo").disabled = false; } };
 };
 
 /* ------------------------------------------------------------ boot */
