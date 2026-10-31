@@ -274,6 +274,7 @@ def _set_role_or_name(spec: TargetSpec, segment: str, had_verb: bool) -> None:
     s = segment.strip(" ,.!?:;-")
     s = re.sub(r"^(?:(?:get|me|a|warm|intro|introduction|can|you|someone|need|looking|for|please)\s+)+", "", s,
                flags=re.I) if not had_verb else s
+    s = _head_of(s)
     s = FILLER_RE.sub("", s).strip()
     s = TRAIL_FILLER_RE.sub("", s).strip(" ,.!?")
     if not s or len(s.split()) > 6:
@@ -288,6 +289,21 @@ def _set_role_or_name(spec: TargetSpec, segment: str, had_verb: bool) -> None:
     elif had_verb and len(s.split()) <= 3 and all(NAME_WORD_RE.fullmatch(w) for w in s.split()) \
             and not _is_school(s) and s.lower() not in NETWORK_FILLER and not set(s.lower().split()) & PREPS:
         spec.person_name = HONORIFIC_RE.sub("", s) or s     # any script: "José Álvarez", "李明"
+
+
+SENIOR_RE = re.compile(r"\b(head|vp|svp|evp|director|chief|c[a-z]o|founder|co-?founder|manager|president|principal|"
+                       r"partner|owner|gm)\b", re.I)
+PERSON_NOUN = r"(?:guy|girl|gal|lady|person|wala|vala|waala|boss|lead|man|woman|dude|in-?charge)"
+
+
+def _head_of(s: str) -> str:
+    """'the data guy' / 'whoever runs data' / 'the growth boss' all mean 'head of <team>' (paraphrase consistency)."""
+    m = (re.match(rf"^(?:the\s+|a\s+|some\s+)?([a-z][\w&/\-]*(?:\s+[a-z][\w&/\-]*)?)\s+{PERSON_NOUN}$", s, re.I)
+         or re.match(r"^(?:whoever|someone who|the person who|who)\s+(?:runs|leads|heads|handles|manages|owns)\s+"
+                     r"(?:the\s+)?([a-z][\w&/\-]*(?:\s+[a-z][\w&/\-]*)?)$", s, re.I))
+    if m and ROLE_RE.search(m.group(1)) and not SENIOR_RE.search(m.group(1)):
+        return f"head of {m.group(1).lower()}"
+    return s
 
 
 def _in_text(value: str, text: str, threshold: int) -> bool:

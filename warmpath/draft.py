@@ -25,8 +25,13 @@ mon tue wed thu fri monday tuesday wednesday thursday friday absolutely sure any
 out love keen great nice really much appreciate appreciated grateful ps p.s. no-pressure""".split())
 
 
+ABBREV_RE = re.compile(r"\b(Pvt|Ltd|Inc|Co|Corp|Pte|LLC|Jr|Sr|Dr|Mr|Mrs|Ms|Prof|St|No|vs|etc|e\.g|i\.e)\.", re.I)
+
+
 def _sentences(text: str) -> list[str]:
-    return [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", text) if s.strip()]
+    """Split on sentence ends, but not inside "3 Embed Software Technologies Pvt. Ltd." or "Dr. Rao"."""
+    guarded = ABBREV_RE.sub(lambda m: m.group(0)[:-1] + "\x00", text)
+    return [s.replace("\x00", ".").strip() for s in re.split(r"(?<=[.!?])\s+|\n+", guarded) if s.strip()]
 
 
 def _facts(path: IntroPath) -> list[str]:
@@ -59,7 +64,7 @@ def _allowed(path: IntroPath) -> str:
 def check_claims(text: str, path: IntroPath) -> list[str]:
     """Return the sentences that state a year, number or proper noun not backed by the path's evidence."""
     allowed = _allowed(path)
-    allowed_words = set(re.findall(r"[a-z0-9][a-z0-9&.\-']*", allowed))
+    allowed_words = {w.rstrip(".") for w in re.findall(r"[a-z0-9][a-z0-9&.\-']*", allowed)}   # "pvt." == "pvt"
     bad = []
     for sent in _sentences(text):
         clean = re.sub(r"\[[^\]]*\]", " ", sent)               # "[Your name]" placeholders are fine

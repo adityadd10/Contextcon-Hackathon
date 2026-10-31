@@ -226,5 +226,23 @@ uv run python -m eval.cofounder_eval --offline   # re-score saved data, 0 credit
   (it recovers Unacademy's Hemesh Singh and Urban Company's Abhiraj Singh Bhal, whom the list missed). Duplicate
   records of one person are merged (PhysicsWallah has two "Alakh Pandey" records). Equal scores count against us.
 
+## Evaluation
+How we know it works: [eval/scorecard.md](eval/scorecard.md) is regenerated on every change, and
+[eval/history.jsonl](eval/history.jsonl) keeps one line per run (git sha + metrics), so each change is judged
+better or worse against the last.
+
+```bash
+uv run python -m eval.run_eval --fake    # 19 offline gold scenarios, 0 credits, deterministic: run before every push
+uv run python -m eval.run_eval           # all 28: + 9 live scenarios on real Crustdata (cached; new requests cost credits)
+uv run python -m eval.run_eval --llm     # LLM parity: the same answers with the free LLM on
+uv run python -m eval.cofounder_eval --offline   # tie-model ground truth: co-founder recovery (91% hit@1)
+```
+
+Every scenario must pass the quality gates: one `done` event, no silent failure, 0 false ties, 0 unsupported draft
+claims, 100% of factors cited, 100% of ties re-verified against full profiles. Product metrics on top: paraphrase
+consistency (rewordings pick the same person), path-found rate, best-path strength, credits per verified path and
+latency. Edge cases found by our adversarial loops are pinned as tests in
+[tests/test_edge_cases.py](tests/test_edge_cases.py) and [tests/test_edge_cases_b.py](tests/test_edge_cases_b.py).
+
 ---
 Team docs: [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) (work split, deliverables, judging) · [docs/PLAN.md](docs/PLAN.md) (technical spec)

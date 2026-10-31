@@ -145,3 +145,25 @@ def test_tie_score_is_symmetric_and_lookalike_names_dont_match():
                                      s("Quarkbase.com", (2007, 12, 1), (2010, 7, 1), "b1")])
     assert [o.company_name for o in find_overlaps(a, b)] == ["QuarkBase.com"]
     assert score_tie(a, b).score == score_tie(b, a).score
+
+
+def test_paraphrases_parse_to_the_same_role():
+    """UPDATES 12:52 (scorecard L01/L02): different wordings must pick the same person."""
+    reqs = ["teh data guy at swigy pls", "head of data at Swiggy", "warm intro to whoever runs data at Swiggy",
+            "the data wala at swiggy", "the data boss at swiggy pls"]
+    assert {parse_rules(r).role for r in reqs} == {"head of data"}
+    assert parse_rules("intro to the sales manager guy at X").role == "sales manager"   # already senior: kept
+
+
+def test_check_claims_does_not_split_at_company_abbreviations():
+    """UPDATES 12:52 (scorecard L06): 'Pvt.' ended the sentence, so a true claim was flagged."""
+    from warmpath.paths import build_paths
+    co = "3 Embed Software Technologies Pvt. Ltd."
+    t = Person("Rahul Sharma", 1, source_endpoint="e", stints=[Stint(co, 7, "Engineer", date(2015, 1, 1), date(2018, 1, 1),
+                                                                     company_headcount=40, ref="t0")])
+    c = Person("Asha Rao", 2, source_endpoint="e", stints=[Stint(co, 7, "Engineer", date(2015, 6, 1), date(2018, 1, 1),
+                                                                   company_headcount=40, ref="c0")])
+    p = build_paths(t, [c], [], TargetSpec(raw="x"))[0]
+    text = f"I noticed you two overlapped at {co} (2015–2018), so you might be the right person to ask."
+    assert draft.check_claims(text, p) == []
+    assert draft.check_claims("Dr. Rao said you worked at Google in 2012.", p)          # still catches lies

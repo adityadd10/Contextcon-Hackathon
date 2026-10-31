@@ -181,3 +181,16 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
   91.3 vs 93.7). Cause: "Lime Labs LLC" matched "Lime Spot Technology India" as a word subset, and overlaps were
   grouped by one side's spelling. → whole-name matching after stripping generic words, order-free grouping. Removed
   ~24 false "worked together again" bonuses. Eval unchanged (91% / 94%). 191 tests.
+- 14:45 · B · UPDATES 12:52 (the 2 red scorecard items): (1) `check_claims` split sentences at "Pvt." so a true claim
+  about "3 Embed Software Technologies Pvt. Ltd." was flagged → abbreviation-safe splitter; L06 passes.
+  (2) paraphrases: "the data guy / data wala / data boss / whoever runs data" now all parse to "head of data". L01, L02,
+  L06 pass live; fake suite 19/19. (3) README `## Evaluation` added.
+- 14:45 · B · ⚠ paraphrase consistency is still not 100%, and the cause is now company resolution, not parsing:
+  "Swiggy" → 5702 (real, 10k+ people) → Srinivas N (Director - Data Science), but "swigy" → 7167477, a junk company
+  literally named "swiggy" with no size → a "Data Entry" profile as head of data. For Aditya (resolve.py): prefer the
+  sized company when names match ignoring case, and require seniority when the role says "head of".
+- 14:45 · B · ⚠ found the hard way: fake-mode runs wrote fake responses (company 1001, empty searches) into the shared
+  `.cache/crust`, so later LIVE runs on the same machine resolved Swiggy to the fake id and found nobody. Cleaned 24
+  poisoned entries on Vaibhav's machine. Anyone who ran WARMPATH_FAKE=1 with the cache on should check theirs before
+  recording the demo (`grep -l '"crustdata_company_id": 1001' .cache/crust/*`). Fix belongs in crust.py: separate
+  cache dir in fake mode. Also: run_eval.py writes the scorecard without encoding="utf-8" and crashes on Windows.

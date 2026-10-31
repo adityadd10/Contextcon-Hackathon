@@ -105,7 +105,7 @@ def test_team_reported_bugs():
     s = parse_rules("intro to Priya Sharma")
     assert s.person_name == "Priya Sharma" and s.company is None and s.role is None
     s = parse_rules("the data guy at swiggy pls")
-    assert s.company == "swiggy" and s.role == "data"
+    assert s.company == "swiggy" and s.role == "head of data"     # UPDATES 12:52: "X guy" means head of X
 
 
 def test_target_company_never_in_network(monkeypatch):
