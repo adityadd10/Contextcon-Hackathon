@@ -1,0 +1,29 @@
+[project]
+name = "warmpath"
+version = "0.1.0"
+description = "WarmPath: warm-intro paths to anyone, every link verified on Crustdata's identity graph"
+authors = [
+    { name = "Aditya Darshan Dewanjee", email = "adityadd2000@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.162.0",
+    "httpx>=0.28.1",
+    "mcp>=1.0",
+    "pypdf>=6.21.4",
+    "python-dateutil>=3.0.0",
+    "python-dotenv>=1.2.4",
+    "rapidfuzz>=3.14.6",
+    "rich>=15.0.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+warmpath = "warmpath.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
