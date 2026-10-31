@@ -158,3 +158,14 @@ def test_same_team_from_titles_when_function_is_missing():
     ta, tb = score_tie(a, t), score_tie(b, t)
     assert any(f.name == "same_team" and f.value == "data" and f.evidence for f in ta.factors)
     assert ta.score > tb.score + 15
+
+
+def test_self_employed_is_not_a_shared_workplace():
+    from warmpath.crust import to_person
+    def raw(pid, co):
+        return {"crustdata_person_id": pid, "basic_profile": {"name": f"P{pid}"},
+                "experience": {"employment_details": {"current": [], "past": [
+                    {"name": co, "title": "Consultant", "start_date": "2020-01-01", "end_date": "2022-01-01"}]}}}
+    a, b = to_person(raw(1, "Self-employed"), "x"), to_person(raw(2, "Self-employed"), "x")
+    assert a.stints == [] and score_tie(a, b).score == 0
+    assert to_person(raw(3, "Freelance"), "x").stints == [] and to_person(raw(4, "Acme"), "x").stints

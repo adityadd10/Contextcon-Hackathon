@@ -129,3 +129,9 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
   links are listed in `claims_unsupported`. Eval re-scored offline: unchanged (91% / 94%).
 - 13:10 · B · "teh data guy at swiggy pls" finds no target on origin/main because the parser fix wasn't pushed yet
   (no repo access for Vaibhav2402). Locally it runs end to end in the fake world: Priya Sharma, 2 verified paths, 2 drafts.
+- 12:20 · Aditya · team crawl (depth 1, 49 credits) gave 208 people / 1,135 relationships, which looked great but was wrong:
+  "Self-employed" etc. were treated as shared employers, building fake cliques (a real false path: Aditya → Ravi →
+  "Self-employed" → Dipyaman). Dropped generic employers at parse time → honest 135 people / 253 relationships.
+- 12:22 · Aditya · with seeds, stranger paths (65) outranked the personal 4-hop path (26) → seed-first ranking ("your paths").
+- 12:25 · Aditya · profiled a fully cached run: 2 s CPU, ~50 s waiting on free-LLM calls → drafts in parallel (34 s);
+  the remaining fix (shorter LLM timeouts) is with Vaibhav.

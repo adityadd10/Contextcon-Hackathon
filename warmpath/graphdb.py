@@ -22,7 +22,7 @@ from pathlib import Path
 
 import networkx as nx
 
-from .crust import parse_date
+from .crust import is_generic_employer, parse_date
 from .models import Company, Person, School, Stint, Tie, to_dict
 from .score import score_tie
 
@@ -67,7 +67,7 @@ def _norm(s: str) -> str:
 def person_from_dict(d: dict) -> Person:
     """Rehydrate a Person stored as JSON (inverse of models.to_dict)."""
     stints = [Stint(**{**s, "start": parse_date(s.get("start")), "end": parse_date(s.get("end"))})
-              for s in d.get("stints") or []]
+              for s in d.get("stints") or [] if not is_generic_employer(s.get("company_name"))]
     schools = [School(**{**s, "start": parse_date(s.get("start")), "end": parse_date(s.get("end"))})
                for s in d.get("schools") or []]
     return Person(**{**d, "stints": stints, "schools": schools})

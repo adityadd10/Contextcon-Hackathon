@@ -25,7 +25,8 @@ async def verify_paths(c: Crust, paths: list[IntroPath], emit: Emit) -> list[Int
     full: dict[int, Person] = {}
     call_id = None
     if people:
-        urls = [p.profile_url for p in list(people.values())[:MAX_VERIFY]]
+        batch = list(people.values())[:MAX_VERIFY]
+        urls = [p.profile_url for p in batch]
         try:
             rows = await c.person_enrich(urls)
             call_id = c.last_call_id
@@ -43,7 +44,8 @@ async def verify_paths(c: Crust, paths: list[IntroPath], emit: Emit) -> list[Int
     kept: list[IntroPath] = []
     for p in paths:
         nodes = [full.get(n.person_id, n) for n in p.nodes]
-        if any(n.person_id in people and n.person_id not in full for n in p.nodes):
+        requested = {b.person_id for b in batch} if people else set()
+        if any(n.person_id in requested and n.person_id not in full for n in p.nodes):
             ev.warn(emit, f"Dropped path #{p.rank}: a person on it could not be re-verified")
             continue
         new_ties, ok = [], True
@@ -70,8 +72,9 @@ async def verify_paths(c: Crust, paths: list[IntroPath], emit: Emit) -> list[Int
             ev.warn(emit, f"Dropped path #{p.rank} ({' → '.join(n.name for n in nodes)}): "
                           f"the overlap disappeared in the full profiles")
             continue
-        kept.append(IntroPath(nodes=nodes, ties=new_ties, score=path_score(new_ties), why=p.why, rank=p.rank))
-    kept.sort(key=lambda p: -p.score)
+        kept.append(IntroPath(nodes=nodes, ties=new_ties, score=path_score(new_ties), why=p.why, rank=p.rank,
+                               via_seed=p.via_seed))
+    kept.sort(key=lambda p: (not p.via_seed, -p.score))
     for i, p in enumerate(kept, 1):
         p.rank = i
     ev.step(emit, "verify", "done", f"{len(kept)}/{len(paths)} paths verified against full profiles",

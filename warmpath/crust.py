@@ -13,6 +13,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import time
 from datetime import date, datetime
 from pathlib import Path
@@ -244,6 +245,16 @@ def _stint(raw: dict, ref: str, is_current: bool) -> Stint:
     )
 
 
+GENERIC_EMPLOYERS = re.compile(
+    r"^\s*(self[\s-]?employed|freelanc\w*|independent( consultant)?|stealth( mode)?( startup)?|confidential|"
+    r"various|n/?a|none|unemployed|career break|own business|personal|private practice|startup)\s*$", re.I)
+
+
+def is_generic_employer(name: str | None) -> bool:
+    """'Self-employed' etc. are not shared workplaces, so two freelancers never 'worked together'."""
+    return not name or bool(GENERIC_EMPLOYERS.match(name))
+
+
 def to_person(pd: dict, endpoint: str) -> Person:
     """Map a Crustdata person_data / search profile dict to Person. Tolerates missing sections."""
     bp = pd.get("basic_profile") or {}
@@ -252,6 +263,7 @@ def to_person(pd: dict, endpoint: str) -> Person:
     emp = (pd.get("experience") or {}).get("employment_details") or {}
     stints = [_stint(r, f"{tag}#experience.current[{i}]", True) for i, r in enumerate(emp.get("current") or [])]
     stints += [_stint(r, f"{tag}#experience.past[{i}]", False) for i, r in enumerate(emp.get("past") or [])]
+    stints = [st for st in stints if not is_generic_employer(st.company_name)]
     schools = [School(name=s.get("school") or "?", degree=s.get("degree"), field_of_study=s.get("field_of_study"),
                       start=parse_date(s.get("start_date") or s.get("start_year")),
                       end=parse_date(s.get("end_date") or s.get("end_year")),

@@ -6,6 +6,42 @@ Aditya's Claude Code appends an entry each improvement loop (about every 25 min 
 
 ---
 
+## 12:27 · Loop 4: team network crawled + personal paths + false-tie fix
+
+**Team seeds are live** (in Aditya's `.env`; all three of you are in Crustdata). The crawl built the team graph from real
+data: **135 people · 253 verified relationships** across your employers (Placement Office IITB, CSIR-NEERI, MRSAC,
+Makr Microsystems, MediaGuru, Architect Sandeep Neena Associates …). Real team ties found: **Aditya ↔ Apurba 69/100**
+(Placement Office, Oct 2025–Jun 2026). Vaibhav reaches the Swiggy data director through a verified 4-hop chain.
+
+**Changed (Aditya):**
+- 🐞 **False ties removed:** "Self-employed", "Freelance", "Stealth", "Confidential" etc. were treated as shared workplaces
+  (two freelancers "worked together"). This inflated the first crawl to 1,135 relationships. `crust.to_person()` now drops
+  generic employers (`crust.is_generic_employer()`), and the graph filters them on load too. The graph was rebuilt from cache for 0 credits.
+- **Seed-first ranking:** paths that start at one of the requester's own profiles come first ("your paths"), then the best
+  other connectors. New field **`IntroPath.via_seed: bool`**.
+- Drafts are generated in parallel. The verify step no longer drops paths beyond the 25-profile enrich batch. 25 tests green.
+
+**Contract additions:** `IntroPath.via_seed`, `crust.is_generic_employer(name)`.
+
+### Vaibhav (Member B): do these
+1. **Latency (demo-critical):** a fully cached run still takes ~34 s, almost all of it LLM wait. In `llm.py`: per-model
+   timeout **12 s** (not 40), an overall deadline of ~20 s per `complete()` call, and skip a model for the rest of the process after a 429/403.
+2. **Cohort ties:** all three of us are IIT Bombay 2025–27, but "classmates" alone gives 15 < MIN_TIE 25, so the edge is dropped.
+   Score **same school + same years + same degree** as a cohort tie (~30), and same school with overlapping years as 15.
+   Note the education years now come from `start_year`/`end_year` (mapped to Jan 1 dates).
+3. Still open: size-weighted overlap (12:08), the parse fixes, `draft.py` verified-only.
+
+### Apurba (Member C): do these
+1. Split the results into **"Your paths"** (`path.via_seed == true`) and **"Other people who can introduce you"**. The first
+   section is the product's key value: an intro through someone *you* know.
+2. Multi-hop paths can be 4–5 nodes long (`Vaibhav → Poorvaj → Mayank → Tom → Srinivas`). Render each path as a
+   horizontal chain with the tie score and a ✓ on every hop, and wrap it on mobile.
+3. Graph tab demo data: `uv run warmpath graph stats` shows the live graph. `/api/graph/subgraph?center=person:379735373&depth=2`
+   is Aditya's ego network. Team person IDs: Aditya `379735373`, Vaibhav `18800780`, Apurba `563317143`.
+4. ⚠️ The real graph has real people's data. Use it live in the demo, but **don't commit `data/`** or screenshots of the raw DB to the repo.
+
+---
+
 ## 12:15 · Loop 3: independent verification pass (criterion "Facts and verification", 20 pts)
 
 **Changed:** new `warmpath/verify.py` (Aditya). After ranking, the pipeline re-fetches everyone on the top paths with

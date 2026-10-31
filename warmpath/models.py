@@ -172,6 +172,7 @@ class IntroPath:
     score: float                                 # 0-100, path strength
     why: str                                     # one-line rationale
     rank: int = 0
+    via_seed: bool = False                       # starts at one of the requester's own (seed) profiles
 
 
 @dataclass

@@ -1,6 +1,7 @@
 """The one entry point used by server, CLI and MCP.  Owner: Member A (integration)."""
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -80,7 +81,7 @@ async def run(request: str, emit: Emit | None = None, *, crust: Crust | None = N
         # 4 score + 5 paths
         ev.step(emit, "score", "start", "Scoring how closely each pair worked together")
         paths = build_paths(target, connectors, seeds, spec)
-        paths = _merge(paths, graph_paths(g, target, seeds), spec)
+        paths = _merge(paths, graph_paths(g, target, seeds), spec, seeds)
         emitted: set[int | None] = set()
         for p in paths:
             for a, t in zip(p.nodes, p.ties):
@@ -102,7 +103,7 @@ async def run(request: str, emit: Emit | None = None, *, crust: Crust | None = N
                     last.score = min(100.0, last.score + fct.contribution)
                     p.score = path_score(p.ties)
                     ev.edge(emit, last.a, last.b, last.score, "web co-mention")
-            paths.sort(key=lambda p: -p.score)
+            paths.sort(key=lambda p: (not p.via_seed, -p.score))
             for i, p in enumerate(paths, 1):
                 p.rank = i
             ev.step(emit, "webproof", "done", "Web evidence attached")
@@ -124,8 +125,8 @@ async def run(request: str, emit: Emit | None = None, *, crust: Crust | None = N
         # 6 drafts
         if paths:
             ev.step(emit, "draft", "start", "Drafting intro requests (local outbox only, nothing is sent)")
-            for p in paths[:3]:
-                d = await draft_intro(p, spec)
+            drafts = await asyncio.gather(*(draft_intro(p, spec) for p in paths[:3]))  # LLM calls in parallel
+            for d in drafts:
                 write_outbox(d, run_id)
                 result.drafts.append(d)
                 emit({"type": "draft", "draft": to_dict(d)})
@@ -176,13 +177,21 @@ def graph_paths(g: GraphStore, target: Person, seeds: list[Person], max_hops: in
     return out
 
 
-def _merge(a: list[IntroPath], b: list[IntroPath], spec: TargetSpec) -> list[IntroPath]:
+def _merge(a: list[IntroPath], b: list[IntroPath], spec: TargetSpec, seeds: list[Person] | None = None
+           ) -> list[IntroPath]:
+    """Paths that start at one of *your* profiles come first (they're actionable today), then the best others."""
+    seed_ids = {s.person_id for s in seeds or []}
+    for p in a + b:
+        p.via_seed = p.nodes[0].person_id in seed_ids
     seen, out = set(), []
-    for p in sorted(a + b, key=lambda p: -p.score):
+    for p in sorted(a + b, key=lambda p: (not p.via_seed, -p.score)):
         key = tuple(n.person_id for n in p.nodes)
         if key not in seen:
             seen.add(key)
             out.append(p)
+    mine = [p for p in out if p.via_seed][: spec.max_paths]
+    others = [p for p in out if not p.via_seed][: spec.max_paths]
+    out = mine + others
     for i, p in enumerate(out, 1):
         p.rank = i
-    return out[: spec.max_paths]
+    return out
