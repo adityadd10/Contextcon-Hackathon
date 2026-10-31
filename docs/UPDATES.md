@@ -6,6 +6,35 @@ Aditya's Claude Code appends an entry each improvement loop (about every 25 min 
 
 ---
 
+## 13:58 · Loop 9: fresh live phrasings, ~30% cheaper requests
+
+Ran 8 new live requests in phrasings the eval doesn't cover ("the founder of X", "someone in product at X", a bare company URL,
+"via NIT Raipur", "head of HR, CRED", a famous name with no company, an undated target). 205 tests green, eval still 28/28.
+
+**Fixed (Aditya):**
+- 💰 **Headcount history re-billed ~34 credits every run.** The batch mixed seeds' and target's employers, so it never hit the cache.
+  It's now two batches: the seeds' employers (stable → cached once, then free) + only the target's searched employers. A new target's
+  `/company/enrich` went **34 → 2 credits**; a fresh request is ~70–80 → ~45–50 credits.
+- Bare company URL (`linkedin.com/company/zepto`) failed when the slug ≠ the stored URL → now falls back to resolving the slug as a
+  name → the real Zepto → its co-founder/CEO.
+- "No warm path" on a target whose roles have **no start dates** now says exactly why instead of the generic hint.
+
+### Vaibhav (Member B): 3 small parser/score items (live repros)
+1. `parse.py`: **"intro to the VP engineering at Groww via NIT Raipur"** → `via=anyone`. The school isn't in `SCHOOL_ALIASES`.
+   Make `via|through <X>` generic: X containing IIT/IIM/IIIT/NIT/BITS/University/College/Institute/School → `network.schools`, else
+   → `network.companies` (the target company is already excluded downstream).
+2. `parse.py`: **"connect me with head of HR, CRED"** → role=`head of HR, CRED`, company=None. Support `<role>, <Company>` and
+   `<role> - <Company>`; also "connect me with" as a request verb.
+3. `score.find_overlaps`: a target whose only role has **no start date** (live: a head of marketing with 1 undated current role)
+   gets 0 ties even with 31 current same-team colleagues. If **both** stints are current at the same `company_id` and one start is
+   missing, count a *conservative* overlap (e.g. min(6 months, the known side's tenure)), marked `"dates missing on one side"` in the
+   factor explanation, and keep `verified` honest. Add a test. The pipeline already explains the no-path case if you skip this.
+
+### Apurba (Member C)
+- No new items. Video with `WARMPATH_MASK_NAMES=1` (13:40 entry). Feature freeze at 14:30.
+
+---
+
 ## 13:40 · Loop 8: privacy mode for the demo video + live end-to-end check
 
 **Live check:** eval **28/28** still green after everyone's latest. The demo request through the **web server**: 8 verified paths,

@@ -214,3 +214,6 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
 - 13:40 · Aditya · the demo video and stage demo would show real strangers' names and careers. Added a display-only privacy mode
   (WARMPATH_MASK_NAMES=1): connectors become initials and their URLs are hidden; the team and the target stay readable. The first version made
   "A.M.." from a name with trailing junk, so initials are now taken from the first 3 clean words.
+- 13:58 · Aditya · cost audit per endpoint: /company/enrich re-billed ~34 credits every run because the headcount batch
+  (seeds + target employers) changed each time and never hit the cache → split into stable seed batch + target-only batch: 34 → 2.
+  Live: a bare company URL with a non-matching slug failed → slug fallback. An undated target role gave a silent "no path" → explicit reason.

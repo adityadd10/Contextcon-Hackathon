@@ -37,7 +37,11 @@ async def resolve_company(c: Crust, query: str, emit: Emit) -> Company | None:
 
     matches: list[dict] = []
     if re.search(r"linkedin\.com/company/", q):
-        matches = await attempt(q, profile_urls=[q])
+        m = re.search(r"linkedin\.com/company/([\w\-%.]+)", q)
+        url = f"https://www.linkedin.com/company/{m.group(1)}" if m else q
+        matches = await attempt(url, profile_urls=[url])
+        if not matches and m:  # slug differs from the stored URL: resolve the slug as a name instead
+            return await resolve_company(c, re.sub(r"[-_]+", " ", m.group(1)), emit)
     elif re.fullmatch(r"(https?://)?(www\.)?[\w\-]+\.[a-z.]{2,}/?", q, re.I):
         matches = await attempt(q, domains=[re.sub(r"^(https?://)?(www\.)?", "", q).strip("/")])
     else:

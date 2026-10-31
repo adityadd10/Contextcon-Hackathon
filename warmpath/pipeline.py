@@ -12,7 +12,7 @@ from pathlib import Path
 from . import events as ev
 from . import headcount
 from .crust import Crust, CrustError
-from .discover import find_connectors, load_seeds
+from .discover import find_connectors, load_seeds, rank_stints
 from .draft import draft_intro, write_outbox
 from .events import Emit
 from .graphdb import GraphStore
@@ -95,10 +95,14 @@ async def run(request: str, emit: Emit | None = None, *, crust: Crust | None = N
         ev.step(emit, "score", "start", "Scoring how closely each pair worked together")
         # company size *during* each overlap (Vaibhav's headcount history): target's employers first, then the
         # seeds' (2-hop ties); one batched /company/enrich, cached, ~2 credits per company
-        hc_ids = list(dict.fromkeys([s.company_id for s in target.stints if s.company_id] +
-                                    [s.company_id for sd in seeds for s in sd.stints if s.company_id]))[:25]
+        # two batches so the cache works: the seeds' employers never change (one paid call, then free forever);
+        # for the target only the employers we actually searched matter (≤ MAX_STINTS), not their whole career
+        seed_ids = sorted({s.company_id for sd in seeds for s in sd.stints if s.company_id})[:25]
+        tgt_ids = [s.company_id for s in rank_stints(target) if s.company_id and s.company_id not in seed_ids]
+        hc_ids = seed_ids + tgt_ids
         try:
-            n_hist = await headcount.load(c, hc_ids)
+            n_hist = (await headcount.load(c, seed_ids) if seed_ids else 0)
+            n_hist += await headcount.load(c, tgt_ids) if tgt_ids else 0
             ev.step(emit, "score", "progress", "Loaded headcount history",
                     f"{n_hist}/{len(hc_ids)} employers have size-over-time data (company size during each overlap)")
         except Exception as e:  # history is an enhancement: scoring falls back to latest headcount
@@ -155,7 +159,13 @@ async def run(request: str, emit: Emit | None = None, *, crust: Crust | None = N
                 emit({"type": "draft", "draft": to_dict(d)})
             ev.step(emit, "draft", "done", f"{len(result.drafts)} drafts written to outbox/")
         else:
-            ev.warn(emit, "No warm path found. Try widening the network (drop the school filter) or add seed profiles.")
+            undated = [st.company_name for st in target.stints if not st.start]
+            if undated and len(undated) == len(target.stints):
+                ev.warn(emit, f"No warm path: Crustdata has no start dates for {target.name}'s roles "
+                              f"({', '.join(undated[:3])}), so no overlap can be proven. Paste their LinkedIn URL for a "
+                              f"fresh profile, or try a colleague of theirs.")
+            else:
+                ev.warn(emit, "No warm path found. Try widening the network (drop the school filter) or add seed profiles.")
     except CrustError as e:
         result.warnings.append(str(e))
         emit({"type": "error", "message": str(e)})
