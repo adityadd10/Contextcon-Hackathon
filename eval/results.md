@@ -7,6 +7,7 @@
 | WarmPath | 91% | 94% |
 | WarmPath w/o title | 91% | 94% |
 | Longest overlap | 88% | 94% |
+| WarmPath, latest headcount | 91% | 94% |
 | Random colleague | 9% | 25% |
 
 | Startup | Target founder | Co-founder rank (WarmPath / overlap only) | Pool | WarmPath #1 pick, top reason |

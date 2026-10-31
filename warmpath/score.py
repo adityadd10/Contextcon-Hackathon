@@ -15,6 +15,7 @@ from datetime import date, timedelta
 
 from rapidfuzz import fuzz
 
+from . import headcount
 from .models import Evidence, Factor, Overlap, Person, School, Stint, Tie
 
 TODAY = date.today()
@@ -111,13 +112,16 @@ def _stint(p: Person, ref: str) -> Stint | None:
     return next((s for s in p.stints if s.ref == ref), None)
 
 
-def _size_points(headcount: int | None) -> tuple[float, str]:
+def _size_points(headcount: int | None, basis: str = "") -> tuple[float, str]:
     if headcount is None:
         return 6.0, "company size unknown"
-    for limit, pts in ((50, 25), (200, 18), (1000, 10), (10000, 5)):
+    basis = basis or f"~{headcount:,} people (latest headcount)"
+    for limit, pts, why in ((50, 25, "a small team, so they likely worked closely"),
+                            (200, 18, "small enough that they likely knew each other"),
+                            (1000, 10, "a mid-size company"), (10000, 5, "a large company")):
         if headcount <= limit:
-            return float(pts), f"~{headcount:,} people (latest headcount), so they likely worked closely"
-    return 2.0, f"~{headcount:,} people (latest headcount), a large org, so the tie is weaker"
+            return float(pts), f"{basis}, {why}"
+    return 2.0, f"{basis}, a large org, so the tie is weaker"
 
 
 def _size_keep(headcount: int | None) -> float:
@@ -168,8 +172,13 @@ def score_tie(a: Person, b: Person) -> Tie:
                               f"Overlapped {main.months:.0f} months at {main.company_name} ({window}){note}", ev))
 
         hc = (sa.company_headcount if sa else None) or (sb.company_headcount if sb else None)
-        pts, why = _size_points(hc)
-        factors.append(Factor("company_size", hc, pts, f"{main.company_name}: {why}", ev[:1]))
+        basis, size_ev = "", ev[:1]
+        if hist := headcount.size_during(main.company_id, main.start, main.end):   # size *during* the overlap
+            hc, basis = hist[0], hist[1]
+            size_ev = [Evidence(f"{main.company_name} headcount: {hist[1]}", "crustdata", "/company/enrich",
+                                f"company:{main.company_id}#headcount.timeseries")]
+        pts, why = _size_points(hc, basis)
+        factors.append(Factor("company_size", hc, pts, f"{main.company_name}: {why}", size_ev))
 
         team: list[str] = []
         if sa and sb:

@@ -135,3 +135,10 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
 - 12:22 · Aditya · with seeds, stranger paths (65) outranked the personal 4-hop path (26) → seed-first ranking ("your paths").
 - 12:25 · Aditya · profiled a fully cached run: 2 s CPU, ~50 s waiting on free-LLM calls → drafts in parallel (34 s);
   the remaining fix (shorter LLM timeouts) is with Vaibhav.
+- 13:35 · B · company size during the overlap: new `warmpath/headcount.py` keeps `/company/enrich` headcount history
+  (weekly, but only from ~2021). The size factor now uses the smallest recorded headcount inside the overlap and
+  cites `company:<id>#headcount.timeseries`; older overlaps say "earliest on record". Deliberately no "joined near
+  founding" bonus: the eval defines co-founders that way, so it would be grading its own answer. Eval: unchanged
+  (91% / 94%, with a latest-headcount ablation row). All 11 startups were already >1k people when their records start,
+  so the gain here is a correct, dated size claim rather than a ranking change. Size text no longer says "worked
+  closely" for a 5k-person company.

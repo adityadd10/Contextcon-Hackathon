@@ -30,6 +30,7 @@ from typing import Callable
 from rapidfuzz import fuzz
 
 from warmpath.crust import parse_date
+from warmpath import headcount
 from warmpath.models import Person, School, Stint, to_dict
 from warmpath.paths import same_person
 from warmpath.score import find_overlaps, score_tie
@@ -213,6 +214,7 @@ async def collect(c, company: str, log=print) -> dict | None:
         return None
     try:
         rows = await c.company_enrich([co.company_id], fields=["basic_info", "headcount", "people"])
+        headcount.register(co.company_id, rows)
     except CrustError as e:
         log(f"  {company}: company enrich failed ({e.message})")
         return None
@@ -235,7 +237,9 @@ async def collect(c, company: str, log=print) -> dict | None:
     res = await c.person_search(f("experience.employment_details.company_id", "=", co.company_id), limit=POOL)
     colleagues = [to_person(p, "/person/search") for p in (res.get("profiles") or res.get("results") or [])]
     log(f"  {company}: {len(founders)} founders, {len(colleagues)} colleagues (id {co.company_id})")
-    return {"company": co.name, "company_id": co.company_id, "year_founded": year, "founders": to_dict(founders),
+    return {"company": co.name, "company_id": co.company_id, "year_founded": year,
+            "headcount_history": [[d.isoformat(), n] for d, n in headcount.HISTORY.get(co.company_id, [])],
+            "founders": to_dict(founders),
             "colleagues": to_dict(colleagues)}
 
 
@@ -268,7 +272,8 @@ def report(results: list[FounderResult], s: dict) -> str:
              f"{s['founders']} founders across {s['companies']} startups; mean candidate pool {s['mean_pool']:.1f} "
              f"people (co-founders + up to {POOL} colleagues from /person/search).\n",
              "| Method | Hit@1 | Hit@3 |", "|---|---|---|"]
-    for m in [*METHODS, "Random colleague"]:
+    for m in [*METHODS, *(["WarmPath, latest headcount"] if "WarmPath, latest headcount" in s else []),
+              "Random colleague"]:
         lines.append(f"| {m} | {s[m]['hit@1']:.0%} | {s[m]['hit@3']:.0%} |")
     lines += ["", "| Startup | Target founder | Co-founder rank (WarmPath / overlap only) | Pool | WarmPath #1 pick, top reason |",
               "|---|---|---|---|---|"]
@@ -299,12 +304,23 @@ async def main_async(args) -> None:
                     (DATA / f"{_slug(name)}.json").write_text(json.dumps(d, indent=1), encoding="utf-8")
                     datasets.append(d)
             print(f"credits used: {c.credits_used:.2f}")
-    results: list[FounderResult] = []
-    for d in datasets:
-        results += evaluate_company(d["company"], [person_from_dict(p) for p in d["founders"]],
+    def run_all() -> list[FounderResult]:
+        out: list[FounderResult] = []
+        for d in datasets:
+            out += evaluate_company(d["company"], [person_from_dict(p) for p in d["founders"]],
                                     [person_from_dict(p) for p in d["colleagues"]],
                                     d.get("company_id"), d.get("year_founded"))
+        return out
+
+    headcount.HISTORY.clear()                     # ablation: latest headcount only
+    latest = summarise(run_all())
+    for d in datasets:
+        if d.get("headcount_history"):
+            headcount.HISTORY[d["company_id"]] = [(date.fromisoformat(x), n) for x, n in d["headcount_history"]]
+    results = run_all()
     s = summarise(results)
+    if latest.get("founders"):
+        s["WarmPath, latest headcount"] = latest["WarmPath"]
     md = report(results, s)
     print(md)
     (HERE / "results.md").write_text(md, encoding="utf-8")

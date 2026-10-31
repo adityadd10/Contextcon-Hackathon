@@ -18,7 +18,11 @@
    "hit@1": 0.08794070512820512,
    "hit@3": 0.24785668136211614
   },
-  "mean_pool": 24.1875
+  "mean_pool": 24.1875,
+  "WarmPath, latest headcount": {
+   "hit@1": 0.90625,
+   "hit@3": 0.9375
+  }
  },
  "results": [
   {
@@ -33,7 +37,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 90.0,
+   "best_cofounder_score": 93.7,
    "top_pick": "Nakul Aggarwal",
    "top_pick_why": "Overlapped 187 months at BrowserStack (2011-04 \u2192 2026-10)"
   },
@@ -49,7 +53,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 86.1,
+   "best_cofounder_score": 91.3,
    "top_pick": "Ritesh Arora",
    "top_pick_why": "Overlapped 187 months at BrowserStack (2011-04 \u2192 2026-10)"
   },
@@ -67,7 +71,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 72.9,
+   "best_cofounder_score": 83.0,
    "top_pick": "Krish Subramanian",
    "top_pick_why": "Overlapped 185 months at Chargebee (2011-06 \u2192 2026-10)"
   },
@@ -85,7 +89,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 72.9,
+   "best_cofounder_score": 83.0,
    "top_pick": "Rajaraman Santhanam",
    "top_pick_why": "Overlapped 185 months at Chargebee (2011-06 \u2192 2026-10)"
   },
@@ -103,7 +107,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 68.0,
+   "best_cofounder_score": 79.9,
    "top_pick": "Rajaraman Santhanam",
    "top_pick_why": "Overlapped 185 months at Chargebee (2011-06 \u2192 2026-10)"
   },
@@ -121,7 +125,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 68.0,
+   "best_cofounder_score": 79.9,
    "top_pick": "Rajaraman Santhanam",
    "top_pick_why": "Overlapped 150 months at Chargebee (2011-06 \u2192 2023-12)"
   },
@@ -139,7 +143,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 77.0,
+   "best_cofounder_score": 89.0,
    "top_pick": "Harsh Jain",
    "top_pick_why": "Overlapped 126 months at Groww (2016-05 \u2192 2026-10)"
   },
@@ -157,7 +161,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 68.0,
+   "best_cofounder_score": 84.6,
    "top_pick": "Harsh Jain",
    "top_pick_why": "Overlapped 126 months at Groww (2016-05 \u2192 2026-10)"
   },
@@ -175,7 +179,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 77.0,
+   "best_cofounder_score": 89.0,
    "top_pick": "Lalit Keshre",
    "top_pick_why": "Overlapped 126 months at Groww (2016-05 \u2192 2026-10)"
   },
@@ -193,7 +197,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 68.0,
+   "best_cofounder_score": 84.6,
    "top_pick": "Lalit Keshre",
    "top_pick_why": "Overlapped 126 months at Groww (2016-05 \u2192 2026-10)"
   },
@@ -211,7 +215,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 58.0,
+   "best_cofounder_score": 71.9,
    "top_pick": "Vivek Gupta",
    "top_pick_why": "Overlapped 136 months at Licious (2015-07 \u2192 2026-10)"
   },
@@ -229,7 +233,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 58.0,
+   "best_cofounder_score": 71.9,
    "top_pick": "Abhay Hanjura",
    "top_pick_why": "Overlapped 136 months at Licious (2015-07 \u2192 2026-10)"
   },
@@ -247,7 +251,7 @@
     "WarmPath w/o title": 4,
     "Longest overlap": 4
    },
-   "best_cofounder_score": 31.2,
+   "best_cofounder_score": 46.2,
    "top_pick": "Vineet Khanna",
    "top_pick_why": "Overlapped 70 months at Supertails (2021-01 \u2192 2026-10)"
   },
@@ -282,7 +286,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 80.5,
+   "best_cofounder_score": 87.8,
    "top_pick": "Abhijit Kane",
    "top_pick_why": "Overlapped 145 months at Postman (2014-10 \u2192 2026-10)"
   },
@@ -299,7 +303,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 68.0,
+   "best_cofounder_score": 76.2,
    "top_pick": "Abhinav Asthana",
    "top_pick_why": "Overlapped 145 months at Postman (2014-10 \u2192 2026-10)"
   },
@@ -316,7 +320,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 80.5,
+   "best_cofounder_score": 87.8,
    "top_pick": "Abhinav Asthana",
    "top_pick_why": "Overlapped 145 months at Postman (2014-10 \u2192 2026-10)"
   },
@@ -467,7 +471,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 47.0,
+   "best_cofounder_score": 58.0,
    "top_pick": "Varun Khaitan",
    "top_pick_why": "Overlapped 146 months at Urban Company (2014-09 \u2192 2026-10)"
   },
@@ -484,7 +488,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 71.9,
+   "best_cofounder_score": 80.5,
    "top_pick": "Abhiraj Singh Bhal",
    "top_pick_why": "Overlapped 146 months at Urban Company (2014-09 \u2192 2026-10)"
   },
@@ -501,7 +505,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 1
    },
-   "best_cofounder_score": 71.9,
+   "best_cofounder_score": 80.5,
    "top_pick": "Varun Khaitan",
    "top_pick_why": "Overlapped 146 months at Urban Company (2014-09 \u2192 2026-10)"
   },
@@ -517,7 +521,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 2
    },
-   "best_cofounder_score": 57.0,
+   "best_cofounder_score": 68.0,
    "top_pick": "Kaivalya V.",
    "top_pick_why": "Overlapped 67 months at Zepto (2021-04 \u2192 2026-10)"
   },
@@ -533,7 +537,7 @@
     "WarmPath w/o title": 1,
     "Longest overlap": 2
    },
-   "best_cofounder_score": 57.0,
+   "best_cofounder_score": 68.0,
    "top_pick": "Aadit Palicha",
    "top_pick_why": "Overlapped 67 months at Zepto (2021-04 \u2192 2026-10)"
   },
