@@ -17,6 +17,9 @@ SENIORITY = [("chief", 6), ("cxo", 6), ("cto", 6), ("ceo", 6), ("founder", 5), (
 STOP = {"the", "of", "at", "for", "and", "whoever", "runs", "leads", "heads", "person", "someone", "guy", "girl"}
 
 
+PLACES = re.compile(r"[\s,\-]+(?:in\s+)?(?:bangalore|bengaluru|mumbai|bombay|delhi|new delhi|ncr|gurgaon|gurugram|noida|pune|"
+                    r"hyderabad|chennai|kolkata|ahmedabad|india|us|usa|uk|london|singapore|dubai|san francisco|sf|"
+                    r"new york|nyc|seattle|europe|apac|emea)\s*$", re.I)
 LEGAL = re.compile(r"\b(inc|llc|ltd|limited|pvt|private|corp|corporation|technologies|technology|labs|co)\b\.?", re.I)
 
 
@@ -47,8 +50,15 @@ async def resolve_company(c: Crust, query: str, emit: Emit) -> Company | None:
         matches = await attempt(q, domains=[re.sub(r"^(https?://)?(www\.)?", "", q).strip("/")])
     else:
         matches = await attempt(q, names=[q])
-        clean = " ".join(LEGAL.sub("", q).split()).title()
         norm = lambda n: re.sub(r"[^a-z0-9]", "", LEGAL.sub("", n or "").lower())
+        # "Uber Bangalore": a trailing place is a location, not the company, unless the full name is itself a company
+        # ("Bank of India", "Air India", "Microsoft India" match exactly and are kept)
+        no_place = PLACES.sub("", q).strip(" ,-")
+        if no_place and len(no_place) >= 2 and no_place.lower() != q.lower() and \
+                not any(norm(to_company(m).name) == norm(q) for m in matches):
+            q = no_place
+            matches = await attempt(q, names=[q])
+        clean = " ".join(LEGAL.sub("", q).split()).title()
         exact = lambda ms: any(norm(to_company(m).name) == norm(clean or q) for m in ms)
         # identify is fuzzy: "swigy" returns a tiny lookalike "swigym". Unless a candidate's name matches exactly, keep
         # gathering candidates down the chain (all free except the 1-credit web search) and pick the best overall.

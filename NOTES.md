@@ -217,3 +217,7 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
 - 13:58 · Aditya · cost audit per endpoint: /company/enrich re-billed ~34 credits every run because the headcount batch
   (seeds + target employers) changed each time and never hit the cache → split into stable seed batch + target-only batch: 34 → 2.
   Live: a bare company URL with a non-matching slug failed → slug fallback. An undated target role gave a silent "no path" → explicit reason.
+- 15:05 · Aditya · final live sweep (22 new requests, Indian + global companies): "Uber Bangalore" resolved to "Uber Works" because a
+  trailing city was read as part of the name → strip a trailing place only when the full name isn't itself a company (first try
+  broke "Bank of India" → "Bank of"; caught by our own test). Also made `warmpath serve` live by default (a leftover
+  WARMPATH_FAKE in the shell had silently put the UI on demo data).

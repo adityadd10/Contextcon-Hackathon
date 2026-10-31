@@ -110,3 +110,25 @@ def test_demo_mode_explains_missing_real_company(monkeypatch):
     r, ev = asyncio.run(_run("warm intro to whoever runs data at Facebook, ideally via IITB folks", GraphStore("g.db")))
     assert r.target is None
     assert any("offline DEMO data" in e.get("message", "") for e in ev)
+
+
+def test_trailing_city_is_not_part_of_company_name():
+    from warmpath.resolve import PLACES
+    assert PLACES.sub("", "Uber Bangalore") == "Uber"
+    assert PLACES.sub("", "Amazon India") == "Amazon"
+    assert PLACES.sub("", "Swiggy, Bengaluru") == "Swiggy"
+
+
+
+@pytest.mark.parametrize("q", ["Uber Bangalore", "Bank of India"])
+def test_city_suffix_only_stripped_when_full_name_is_not_a_company(q):
+    from warmpath import fake
+    fake.COMPANIES.setdefault(7007, {"name": "Uber", "primary_domain": "uber.com", "employee_count_range": "10001+", "headcount": 30000})
+    fake.COMPANIES.setdefault(7008, {"name": "Bank of India", "primary_domain": "bankofindia.co.in", "employee_count_range": "10001+", "headcount": 50000})
+
+    async def go():
+        from warmpath.resolve import resolve_company
+        async with Crust(api_key="x", use_cache=False, transport=FakeCrust(False).transport(), pace=False) as c:
+            return await resolve_company(c, q, lambda e: None)
+    co = asyncio.run(go())
+    assert co and co.name == {"Uber Bangalore": "Uber", "Bank of India": "Bank of India"}[q]
