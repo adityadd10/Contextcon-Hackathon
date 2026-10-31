@@ -29,6 +29,7 @@ VW, VH, DPR = 1440, 900, 1.5
 
 # Voice lines, keyed by scene id (the Remotion composition uses the same ids).
 VO = {
+    "team": "Hi! We are team Second Degrees: Aditya, Vaibhav and Apurba.",
     "hook": "Cold messages get ignored. Warm introductions get answered. But finding who can introduce you takes hours, or a paid broker.",
     "logo": "Meet WarmPath. The warm intro, done for you.",
     "ask": "Just say who you want to meet. WarmPath finds the real person on Crustdata.",
@@ -37,6 +38,7 @@ VO = {
     "proof": "Every reason is backed by a real record. One click shows the exact source.",
     "inbox": "It even writes the intro for you. You just approve. Nothing is sent without you.",
     "teams": "Founders, recruiters and sales teams can map a whole list at once.",
+    "network": "And every search grows your own knowledge network of verified relationships, so the next intro is even faster.",
     "stat": "And it works. In testing, WarmPath picked the real co-founder as the top connector ninety-one percent of the time.",
     "end": "WarmPath. The warm intro, done for you.",
 }
@@ -161,6 +163,25 @@ class Cam:
         await self.wait(2.0)
 
 
+    async def network(self) -> None:
+        await self.click('nav.tabs button[data-tab="graph"]')
+        await self.wait(1.6)
+        # let the viewer watch the knowledge network form: scatter the nodes, then let the physics pull them together
+        await self.p.evaluate("""() => { if (typeof gNet === 'undefined' || !gNet.moveNode) return;
+            gNet.setOptions({physics: {enabled: true, stabilization: false, forceAtlas2Based: {gravitationalConstant: -60, springLength: 120}}});
+            gNodes.getIds().forEach((id, i) => gNet.moveNode(id, Math.cos(i * 2.4) * 380, Math.sin(i * 2.4) * 230));
+            gNet.startSimulation(); }""")
+        await self.wait(3.2)
+        await self.p.evaluate("() => typeof gNet !== 'undefined' && gNet.fit({animation: {duration: 900, easingFunction: 'easeInOutCubic'}})")
+        await self.wait(1.2)
+        await self.rect("net_graph", "#graphNet")
+        await self.click("#pGo")
+        await self.wait(1.6)
+        await self.rect("net_route", "#pOut")
+        await self.move("#pOut .chain", 26)
+        await self.wait(1.6)
+
+
 async def record(base: str, work: Path) -> tuple[list, dict, dict, float]:
     from playwright.async_api import async_playwright
     frames_dir = work / "frames"
@@ -187,7 +208,7 @@ async def record(base: str, work: Path) -> tuple[list, dict, dict, float]:
                                                 "maxHeight": int(VH * DPR), "everyNthFrame": 1})
         await page.wait_for_timeout(400)
         cam = Cam(page)
-        for beat in ("ask", "route", "proof", "inbox", "teams"):
+        for beat in ("ask", "route", "proof", "inbox", "teams", "network"):
             mv.log(f"recording {beat}")
             cam.mark(beat, "start")
             await getattr(cam, beat)()

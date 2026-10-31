@@ -21,6 +21,7 @@ const R = manifest.rects;
 
 // ------------------------------------------------------------------ scene plan
 const plan = [
+  {id: 'team', len: vo('team').seconds + 1.6},
   {id: 'hook', len: vo('hook').seconds + 0.7},
   {id: 'logo', len: vo('logo').seconds + 0.9},
   {id: 'ask', len: Math.max(vo('ask').seconds + 0.6, clip('ask').seconds), clip: 'ask', chip: ['01', 'Just ask'],
@@ -34,6 +35,9 @@ const plan = [
     zooms: [[0, null, 1], [0.9, 'inbox_draft', 1.4]]},
   {id: 'teams', len: Math.max(vo('teams').seconds + 0.6, clip('teams').seconds), clip: 'teams', chip: ['05', 'Whole lists at once'],
     zooms: [[0, null, 1], [clip('teams').seconds * 0.68, 'teams_table', 1.35]]},
+  {id: 'network', len: Math.max(vo('network').seconds + 0.6, clip('network').seconds), clip: 'network', chip: ['06', 'Your knowledge network'],
+    zooms: [[0, null, 1], [clip('network').seconds * 0.18, 'net_graph', 1.3], [clip('network').seconds * 0.6, null, 1],
+            [clip('network').seconds * 0.74, 'net_graph', 1.4]]},
   {id: 'stat', len: vo('stat').seconds + 1.0},
   {id: 'end', len: vo('end').seconds + 2.2},
 ].map(s => ({...s, frames: sec(s.len)}));
@@ -226,6 +230,38 @@ const Graph = () => {
     <Caption k="graph" /><Voice k="graph" /></AbsoluteFill>;
 };
 
+const Team = () => {
+  const f = useCurrentFrame(); const {fps} = useVideoConfig();
+  const people = [{n: 'Aditya', x: 560}, {n: 'Vaibhav', x: 960}, {n: 'Apurba', x: 1360}];
+  const y = 700;
+  return <AbsoluteFill><Backdrop />
+    <AbsoluteFill style={{alignItems: 'center', flexDirection: 'column', paddingTop: 190}}>
+      <div style={{font: `500 22px ${SANS}`, color: C.accent, letterSpacing: 4, textTransform: 'uppercase', ...rise(f, fps, 2, 20)}}>
+        ContextCon 03 · IIT Bombay</div>
+      <div style={{font: `400 34px ${SERIF}`, color: C.muted, marginTop: 34, fontStyle: 'italic', ...rise(f, fps, 8, 20)}}>Team</div>
+      <div style={{display: 'flex', marginTop: 6}}>
+        {'Second Degrees'.split('').map((l, i) => <span key={i} style={{font: `400 168px/1 ${SERIF}`, letterSpacing: '-0.02em', color: C.ink,
+          display: 'inline-block', whiteSpace: 'pre', ...rise(f, fps, 12 + i * 1.5, 50)}}>{l}</span>)}
+      </div>
+    </AbsoluteFill>
+    <svg width="1920" height="1080" style={{position: 'absolute'}}>
+      {[0, 1].map(i => {
+        const p = interpolate(f, [34 + i * 12, 52 + i * 12], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.inOut(Easing.cubic)});
+        const a = people[i].x, b = people[i + 1].x;
+        return <line key={i} x1={a} y1={y} x2={a + (b - a) * p} y2={y} stroke={C.ink2} strokeWidth={4} strokeLinecap="round" strokeDasharray="2 14" />;
+      })}
+      {people.map((m, i) => {
+        const s = spring({frame: f - 28 - i * 12, fps, config: {damping: 11}});
+        const col = [C.good, C.ink, C.accent][i];
+        return <g key={m.n}><circle cx={m.x} cy={y} r={24 * s} fill={col} />
+          <circle cx={m.x} cy={y} r={24 * s + 12} fill="none" stroke={col} strokeOpacity={0.18} strokeWidth={8} /></g>;
+      })}
+    </svg>
+    {people.map((m, i) => <div key={m.n} style={{position: 'absolute', left: m.x - 150, width: 300, top: y + 52, textAlign: 'center',
+      font: `500 36px ${SANS}`, color: C.ink, ...rise(f, fps, 34 + i * 12, 16)}}>{m.n}</div>)}
+    <Caption k="team" /><Voice k="team" /></AbsoluteFill>;
+};
+
 const Stat = () => {
   const f = useCurrentFrame(); const {fps} = useVideoConfig();
   const p = spring({frame: f - 10, fps, config: {damping: 30, mass: 1.4}});
@@ -256,11 +292,12 @@ const Music = () => {
 // ------------------------------------------------------------------ the edit
 const render = s => {
   if (s.clip) return <DeviceScene s={s} />;
+  if (s.id === 'team') return <Team />;
   if (s.id === 'hook') return <Hook />;
   if (s.id === 'logo') return <Logo />;
   if (s.id === 'graph') return <Graph />;
   if (s.id === 'stat') return <Stat />;
-  return <Logo id="end" sub="The warm intro, done for you." meta="Aditya · Vaibhav · Apurba  —  ContextCon IIT Bombay  —  github.com/adityadd10/Contextcon-Hackathon" />;
+  return <Logo id="end" sub="The warm intro, done for you." meta="Team Second Degrees  ·  Aditya · Vaibhav · Apurba  —  ContextCon 03, IIT Bombay  —  github.com/adityadd10/Contextcon-Hackathon" />;
 };
 
 export const Pitch = () => (
