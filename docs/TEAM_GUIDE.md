@@ -1,6 +1,9 @@
 # WarmPath: team guide (read this first)
 
 **ContextCon 03 · IIT Bombay · 31 Oct 2026 · Code freeze 3:30 PM (last call 3:00 PM)**
+
+**Team:** Aditya (Member A: data, graph, integration, submission) · Vaibhav (Member B: intelligence) ·
+Apurba (Member C: product, UI, video)
 Repo: https://github.com/adityadd10/Contextcon-Hackathon (public, since judges must be able to open it)
 
 This is the single source of truth for the team: what we're building, who builds what, what we must submit,
@@ -42,10 +45,10 @@ It also serves Hiring, Revenue and Investing.
 | Criterion | Points | What judges ask | How WarmPath earns it | Owner |
 |---|---|---|---|---|
 | **End-to-end execution** | **25** | Takes a request it has never seen all the way to finished work, with a person only for exceptions? | One sentence in → resolved target → ranked paths → intro drafts in outbox. No manual steps. Works on any company or person. | A |
-| **Facts and verification** | **20** | Is every fact correct, does every decision show reasons and sources? | Every tie lists its factors (months of overlap, company size, team, recency) with Crustdata record refs, profile URLs and web URLs. Drafts may only state cited facts. Audit trail: every API call with credits and a response hash. | B |
-| **Robustness and edge cases** | **20** | Messy inputs, unusual cases, failing tools? | Typos and vague roles ("the data guy at swiggy"), company aliases/domains/URLs, redacted or not-found profiles, missing dates, 429 retry and pacing, credit budget, LLM down → rule-based fallback, stale-profile warnings. | A + B |
+| **Facts and verification** | **20** | Is every fact correct, does every decision show reasons and sources? | Every tie lists its factors (months of overlap, company size, team, recency) with Crustdata record refs, profile URLs and web URLs. Drafts may only state cited facts. Audit trail: every API call with credits and a response hash. | Vaibhav |
+| **Robustness and edge cases** | **20** | Messy inputs, unusual cases, failing tools? | Typos and vague roles ("the data guy at swiggy"), company aliases/domains/URLs, redacted or not-found profiles, missing dates, 429 retry and pacing, credit budget, LLM down → rule-based fallback, stale-profile warnings. | Aditya + Vaibhav |
 | **Customer value and idea** | **20** | Would a business pay today? Is the approach new? | Intro brokers, recruiters and SDR teams pay for this now. New approach: ties come from *verified co-employment on a canonical graph*, not self-reported connections, and the graph learns and densifies. | all |
-| **Demo and understanding** | **15** | Does the demo show the job clearly, does the team understand the problem? | A 2-min Loom on a request it has never seen, sources shown on screen. README plus NOTES.md cover approaches, failures, the hardest case and testing. | C |
+| **Demo and understanding** | **15** | Does the demo show the job clearly, does the team understand the problem? | A 2-min Loom on a request it has never seen, sources shown on screen. README plus NOTES.md cover approaches, failures, the hardest case and testing. | Apurba |
 
 **What the judges want to hear** (deck p.39): cover each of these in the video, README and finals. Owners are in §7.
 - **The service:** who pays for it today, and why we picked it.
@@ -62,8 +65,8 @@ It also serves Hiring, Revenue and Investing.
 | # | Deliverable | Requirement (from the deck) | Owner | Due |
 |---|---|---|---|---|
 | 1 | **Public GitHub repo** | Judges must be able to open it. Commit history must start on 31 Oct; commit as you go. | A | continuous |
-| 2 | **README.md** | Five required sections: *the service* (who does it today, who pays) · *what it does now* (end to end, where it still needs a person) · *what it could do next* (and why not now) · *how to run it and how it's built* (agents, models, tools, data, **where it calls Crustdata**) · *the approaches we tried* (what worked, what didn't, why this one) | C writes, A + B add their parts | 3:00 PM |
-| 3 | **2-minute Loom video** | Your product taking a request it has never seen to finished work. Show the whole job, show your sources, one-sentence intro, **check it plays in a private window**. | C records, all review | 3:15 PM |
+| 2 | **README.md** | Five required sections: *the service* (who does it today, who pays) · *what it does now* (end to end, where it still needs a person) · *what it could do next* (and why not now) · *how to run it and how it's built* (agents, models, tools, data, **where it calls Crustdata**) · *the approaches we tried* (what worked, what didn't, why this one) | Apurba writes, Aditya + Vaibhav add their parts | 3:00 PM |
+| 3 | **2-minute Loom video** | Your product taking a request it has never seen to finished work. Show the whole job, show your sources, one-sentence intro, **check it plays in a private window**. | Apurba records, all review | 3:15 PM |
 | 4 | **Submission form** | Team name, one-line description, theme · repo link · Loom link · for **every member**: name and email exactly as on the YC registration, IIT Bombay email, roll number, personal email, GitHub username | A submits | 3:20 PM |
 | 5 | **NOTES.md** | "Keep notes: what you try and what fails." This feeds the README and the finals Q&A. Everyone appends. | all | continuous |
 | 6 | **Finals prep** (if top 10, announced 5:00 PM) | 5-min **live** demo plus 2 min of questions. Have a warm cache and a backup recording. | all | 5:00 PM |
@@ -88,7 +91,7 @@ small commit and a heads-up in the team chat. That's how we avoid merge conflict
 4. Robustness: same-name disambiguation, `redacted`/`not_found`, budget stops, stale profiles.
 5. Own the repo, the merges and the submission form. Write the README's "how it's built / where we call Crustdata" section.
 
-### Member B: intelligence: parsing, scoring, drafts, eval
+### Member B: Vaibhav: intelligence: parsing, scoring, drafts, eval
 **Owns:** `warmpath/parse.py`, `score.py`, `paths.py`, `webproof.py`, `draft.py`, `llm.py`, `eval/`, `tests/`
 1. `parse.py`: OpenRouter free model plus a rule-based fallback. Test 15 messy requests (typos, URLs, Hinglish, vague roles).
 2. `score.py`/`paths.py`: tune the tie model (PLAN §3) so "small team, long overlap" beats "both at a big company". Every Factor carries Evidence.
@@ -98,7 +101,7 @@ small commit and a heads-up in the team chat. That's how we avoid merge conflict
    This gives us our "how we know it works" number.
 5. Write the README's "approaches we tried" and "testing" sections from NOTES.md.
 
-### Member C: product: UI, graph explorer, MCP, README, video
+### Member C: Apurba: product: UI, graph explorer, MCP, README, video
 **Owns:** `warmpath/server.py`, `warmpath/static/*`, `warmpath/cli.py`, `warmpath/mcp_server.py`, `README.md`, `fixtures/`
 1. `fixtures/mock_events.jsonl` first (event schema in PLAN §6), so the UI can be built before the backend is ready.
 2. `server.py` (FastAPI): `GET /` UI · `GET /api/run?q=` SSE stream from `pipeline.run` (`?mock=1` replays fixtures) ·
@@ -132,7 +135,7 @@ cp .env.example .env        # paste YOUR CRUSTDATA_API_KEY and OPENROUTER_API_KE
 uv run --with pytest pytest -q tests      # should be all green
 uv run warmpath graph stats               # sanity check: prints an empty graph
 ```
-Ask Aditya to add you as a collaborator on GitHub (repo → Settings → Collaborators) so you can push.
+Vaibhav and Apurba: ask Aditya to add you as a collaborator on GitHub (repo → Settings → Collaborators) so you can push.
 
 ### 5.3 Start your Claude Code
 Open the folder in VS Code (or a terminal), start Claude Code, and paste **your** prompt from §5.4. Claude Code reads
@@ -152,16 +155,16 @@ Tell your Claude Code: *"commit and push my changes"* works too. It knows the ru
 > between the documented and real response shapes in crust.py/resolve.py/discover.py, and make three different requests work
 > end to end. Then crawl our team's profiles into the graph. Log every failure and fix in NOTES.md. Commit and push small, often.
 
-**Member B:**
-> Read CLAUDE.md, docs/TEAM_GUIDE.md and docs/PLAN.md. I'm Member B (intelligence). I own warmpath/parse.py, score.py, paths.py,
+**Member B (Vaibhav):**
+> Read CLAUDE.md, docs/TEAM_GUIDE.md and docs/PLAN.md. I'm Vaibhav, Member B (intelligence). I own warmpath/parse.py, score.py, paths.py,
 > webproof.py, draft.py, llm.py, eval/ and tests/. Only edit those. (1) Make parse.py robust: OpenRouter free model via llm.py,
 > rule-based fallback, and tests for 15 messy requests. (2) Tune score.py/paths.py per PLAN §3. Every Factor needs Evidence.
 > Add unit tests with hand-made Person objects. (3) draft.py: drafts contain only cited facts and check_claims flags the rest.
 > (4) Build eval/cofounder_eval.py per TEAM_GUIDE §4 and print a results table. Log what you tried and what failed in
 > NOTES.md. Commit and push small, often, with `git pull --rebase` first.
 
-**Member C:**
-> Read CLAUDE.md, docs/TEAM_GUIDE.md and docs/PLAN.md. I'm Member C (product). I own warmpath/server.py, warmpath/static/*,
+**Member C (Apurba):**
+> Read CLAUDE.md, docs/TEAM_GUIDE.md and docs/PLAN.md. I'm Apurba, Member C (product). I own warmpath/server.py, warmpath/static/*,
 > warmpath/cli.py, warmpath/mcp_server.py, README.md and fixtures/. Only edit those. (1) Write fixtures/mock_events.jsonl
 > matching the PLAN §6 event schema. (2) Build server.py (FastAPI + SSE: /api/run, /api/crawl, /api/graph/*) and
 > static/index.html (single file, vis-network from cdnjs): live steps, path graph, path cards with clickable citations,
@@ -172,7 +175,7 @@ Tell your Claude Code: *"commit and push my changes"* works too. It knows the ru
 
 ---
 
-## 6. The 2-minute Loom video (Member C records, everyone reviews)
+## 6. The 2-minute Loom video (Apurba records, everyone reviews)
 
 | Time | Shot | Point it makes (criterion) |
 |---|---|---|
@@ -192,7 +195,7 @@ Before submitting: **open the Loom link in a private window and check it plays.*
 
 ## 7. Timeline (IST)
 
-| Time | Everyone | A | B | C |
+| Time | Everyone | Aditya (A) | Vaibhav (B) | Apurba (C) |
 |---|---|---|---|---|
 | now–11:45 | Credits, clone, `.env`, Claude Code kickoff | live API test | parser tests | mock events + server skeleton |
 | 11:45–1:00 | build | end-to-end on real data | scoring + drafts | UI main flow |

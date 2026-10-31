@@ -1,7 +1,7 @@
 # WarmPath
 
 **Warm intros to anyone, with every link verified on Crustdata's identity graph.**
-ContextCon 03 · IIT Bombay · Theme: Infrastructure for agents (also Hiring, Revenue, Investing)
+Team: Aditya · Vaibhav · Apurba · ContextCon 03 · IIT Bombay · Theme: Infrastructure for agents (also Hiring, Revenue, Investing)
 
 > _Team: fill in the sections below before 3:00 PM. Judges start here. Structure follows the event deck's README guide._
 
@@ -15,7 +15,7 @@ actually knows the target well enough to introduce you*, and then asking them. T
 ## What it does now
 _The parts of the job it handles end to end, and where it still needs a person._
 
-TODO (A/C): request → resolve target → connectors with overlap → explainable tie scores → ranked paths → cited intro
+TODO (Aditya/Apurba): request → resolve target → connectors with overlap → explainable tie scores → ranked paths → cited intro
 drafts in `outbox/` → persistent social graph. A person is needed only to approve sending.
 
 ## What it could do next
@@ -38,10 +38,10 @@ Search, Person Enrich, Company Enrich, Web Search) and why each.
 ## The approaches we tried
 _What worked, what didn't, and why we chose the one we built._ (Source: [NOTES.md](NOTES.md))
 
-TODO (B)
+TODO (Vaibhav)
 
 ## Testing
-TODO (B): unit tests, co-founder recovery eval (top-1/top-3 vs baseline), messy-input suite.
+TODO (Vaibhav): unit tests, co-founder recovery eval (top-1/top-3 vs baseline), messy-input suite.
 
 ---
 Team docs: [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) (work split, deliverables, judging) · [docs/PLAN.md](docs/PLAN.md) (technical spec)

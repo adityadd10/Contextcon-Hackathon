@@ -119,7 +119,7 @@ Score = min(100, sum). Path score = `0.7 × weakest tie + 0.3 × mean tie`, × `
 
 ## 5. Team split (3 members, each with Claude Code). Own your files to avoid merge conflicts.
 
-| | **Member A (Aditya): data and graph core + integration** | **Member B: intelligence** | **Member C: product, UI and demo** |
+| | **Member A (Aditya): data and graph core + integration** | **Member B (Vaibhav): intelligence** | **Member C (Apurba): product, UI and demo** |
 |---|---|---|---|
 | Owns | `warmpath/crust.py`, `resolve.py`, `discover.py`, `pipeline.py`, **`graphdb.py`, `crawl.py`** | `parse.py`, `score.py`, `paths.py`, `webproof.py`, `draft.py`, `eval/` | `server.py`, `static/*`, `cli.py`, `mcp_server.py`, `README.md`, demo video |
 | MVP | Resolve target; connector search; seeds; enrich; budget/caching | LLM + rule parser; tie scoring; path ranking; drafts + claim check | FastAPI SSE server; single-page UI with graph (vis-network via CDN); CLI with rich; mock events |
@@ -234,14 +234,14 @@ Member C: write `fixtures/mock_events.jsonl` first, matching this schema, so the
 
 ## 10. Kickoff prompts (paste into each member's Claude Code)
 
-**Member B:**
+**Member B (Vaibhav):**
 > Read CLAUDE.md and docs/PLAN.md. I'm Member B (intelligence). Implement warmpath/parse.py (OpenRouter LLM via
 > warmpath/llm.py plus a robust rule-based fallback), score.py (find_overlaps, score_tie per section 3 with Evidence on
 > every Factor), paths.py, webproof.py and draft.py (drafts may only state facts present in the path's Evidence;
 > list any unsupported claim). Keep to the section 6 signatures. Add unit tests in tests/ with hand-made Person objects (no API).
 > Then build eval/cofounder_eval.py (section 4, item 14).
 
-**Member C:**
+**Member C (Apurba):**
 > Read CLAUDE.md and docs/PLAN.md. I'm Member C (product). First write fixtures/mock_events.jsonl matching the event
 > schema in section 6. Then build warmpath/server.py (FastAPI: GET / serves static/index.html, GET /api/run?q=... streams
 > SSE events from pipeline.run, or replays the mock file when ?mock=1) and static/index.html: a single page, no build step,

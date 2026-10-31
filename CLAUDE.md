@@ -1,7 +1,7 @@
 # WarmPath: notes for Claude Code sessions
 
 Hackathon project (ContextCon IIT Bombay, Crustdata track, code freeze 15:30 IST, 31 Oct 2026).
-Three people build in parallel. **Read [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) first** (work split, file ownership, deliverables, judging criteria),
+Three people build in parallel: Aditya (Member A), Vaibhav (Member B), Apurba (Member C). **Read [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) first** (work split, file ownership, deliverables, judging criteria),
 then [docs/PLAN.md](docs/PLAN.md) (technical spec, algorithms, API notes, function signatures).
 Log what you try and what fails in [NOTES.md](NOTES.md). Judges ask about it.
 
