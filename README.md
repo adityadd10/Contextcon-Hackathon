@@ -38,18 +38,45 @@ One sentence in, finished work out, no manual steps:
 7. **Learns.** Every person and relationship goes into a persistent social graph, so later queries are cheaper and better.
 8. **Audits.** Every API call is logged with its request, credits used and a sha256 of the response.
 
+9. **Waits for a person, only where one is needed.** Every draft lands in an **Inbox** review queue. A person edits the
+   wording, then approves or rejects it. Approving saves the final text to `outbox/…approved.md` for them to send; WarmPath
+   itself never sends anything. Edited drafts are marked "not re-checked", because human wording isn't fact-checked.
+
 **Where it still needs a person:** approving and sending the intro (by design, and required by the event rules),
 and judging cases where the data is thin (redacted profiles, no dates, or no overlap within the network).
 
+### Built for real use, not just the demo
+- **Your paths first.** Routes that start with someone *you* know are shown first ("Your paths"), and other connectors
+  come after. Every hop in a chain shows its own tie score and a ✓ when it was re-verified against full profiles.
+- **Account map.** Paste up to 15 target accounts, one per line, and get the best verified warm route into each in one
+  table. This is the account-planning job SDR teams, recruiters and fundraisers do by hand. One bad row never stops the rest.
+- **History for 0 credits.** Every past search can be reopened instantly from saved reports, with no new API calls.
+- **Shareable brief.** Each run exports as a Markdown document (`/api/report/<run_id>.md`): the answer, every route,
+  every factor with its Crustdata source and audit call, the drafts and their review state, and the audit table.
+- **Safe to deploy.** All off by default, switched on with environment variables:
+  - `WARMPATH_ACCESS_KEY`: a private-link access key (cookie set by visiting `/?key=…`)
+  - `WARMPATH_RATE_PER_HOUR`: paid searches per visitor per hour
+  - `WARMPATH_DAILY_CREDITS`: a daily credit cap, after which only free replays and history work
+
+  Security headers (CSP, no framing) are always on. Only one paid run happens at a time, so the credit budget and the
+  graph stay consistent.
+
 ### Three ways to use it
-- **Web UI** (`warmpath serve`): live step stream with the reason behind each decision, a path graph (click any edge to see its evidence), path cards with clickable citations, a Drafts tab, an Audit drawer, and a **Social graph** tab. The Social graph tab shows the whole network, lets you click an edge for its evidence, finds the path between any two people, lists super-connectors, and has a "Crawl my network" button.
+- **Web UI** (`warmpath serve`), with four tabs:
+  - **Find a path:** live steps with the reason behind each decision, a one-sentence answer, a path graph (click any line for its evidence), cited routes, drafts, a downloadable brief, and an audit log where every citation links to its API call.
+  - **Accounts:** the account map.
+  - **Inbox:** the review queue.
+  - **Network:** the whole graph, the strongest route between any two people, the best connectors, and "grow your network".
+
+  It works in light and dark mode and on phones, and still works if the graph library's CDN is blocked.
 - **CLI** (`warmpath "<request>"`): the same live output in the terminal.
 - **MCP server** (`warmpath mcp`): tools `find_warm_paths`, `explain_tie` and `graph_path`, so any agent (Claude Code or Desktop) can find warm paths. This is the "infrastructure for agents" angle.
 
 ## What it could do next
 _What we'd build with more time, and why now isn't the time._
 
-- **Account maps for sales:** take a CSV of 20 target accounts and return the best warm path into each. The pipeline already does one account at a time, so this mostly needs batching and credit planning, which takes more credits than a hackathon day has.
+- **CRM sync for the account map:** import target accounts from and write routes back to Salesforce/HubSpot. The account
+  map already works on a pasted list; connectors need OAuth and a customer's sandbox, which we don't have today.
 - **Watchers:** use `/watch/person` on targets and connectors and alert when a new path appears or a connector changes jobs. This only pays off over weeks, so it can't be demoed in a day.
 - **Two-sided consent:** the connector approves forwarding in one click before anything reaches the target. That needs real messaging and accounts, and the rules (rightly) forbid contacting people today.
 - **Learned tie weights:** fit the factor weights on accepted vs. ignored intros. That needs outcome data we don't have yet. Today's weights are hand-set and explainable.

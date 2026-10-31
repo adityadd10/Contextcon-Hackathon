@@ -274,6 +274,48 @@ select.field{appearance:none;background-image:linear-gradient(45deg,transparent 
 #edgeInfo .tie{padding-top:0}
 #pOut .chain{margin:14px 0 4px}
 
+/* per-hop chain */
+.hop{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:11px;color:var(--muted);padding:0 2px}
+.hop .ln{width:14px;height:1px;background:var(--line-strong)}
+.hop.v b{color:var(--good);font-weight:500}
+.group{font-size:12px;color:var(--muted);margin:26px 0 0;display:flex;gap:10px;align-items:center}
+.group:first-child{margin-top:12px}
+.group b{color:var(--ink);font-weight:500;font-size:13.5px}
+.group .grow{flex:1;height:1px;background:var(--line)}
+.actions{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:13px}
+.actions a,.actions button{color:var(--ink-2);border-bottom:1px solid var(--line-strong);padding-bottom:1px;text-decoration:none}
+.actions a:hover,.actions button:hover{color:var(--ink);border-color:var(--ink)}
+.navn{font-family:var(--mono);font-size:10.5px;background:var(--accent);color:#fff;border-radius:99px;padding:1px 6px;margin-left:5px;vertical-align:1px}
+.recent{max-width:860px;margin:0 auto 64px;text-align:left}
+.recent .item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;padding:12px 2px;border-bottom:1px solid var(--line);cursor:pointer;width:100%;text-align:left}
+.recent .item:hover .q{text-decoration:underline;text-underline-offset:3px}
+.recent .q{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.recent .r{color:var(--muted);font-size:12.5px;white-space:nowrap}
+@media (max-width:640px){.recent .item{grid-template-columns:1fr}.recent .r{white-space:normal}}
+.compact .recent{display:none}
+.page{padding-block:40px 80px}
+.page h2{font-family:var(--serif);font-weight:400;font-size:40px;line-height:1.05;letter-spacing:-.015em;margin:0}
+.page .sub{color:var(--muted);max-width:640px;margin:10px 0 26px}
+textarea.field{min-height:150px;resize:vertical;line-height:1.6;font-family:var(--sans)}
+.tblwrap{overflow-x:auto;margin-top:26px}
+.tbl{width:100%;border-collapse:collapse;min-width:640px}
+.tbl th{position:static;background:none}
+.tbl td{padding:14px 8px;vertical-align:middle}
+.tbl tr.click{cursor:pointer} .tbl tr.click:hover td{background:var(--sunken)}
+.state{font-size:12px;color:var(--muted)} .state.run{color:var(--ink)}
+.state.run:before{content:"";display:inline-block;width:9px;height:9px;border:1.5px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite;margin-right:6px;vertical-align:-1px}
+.big{font-family:var(--serif);font-size:26px;line-height:1}
+.filters{display:flex;gap:22px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.filters button{padding:0 0 12px;color:var(--muted);border-bottom:1.5px solid transparent;margin-bottom:-1px;font-weight:500}
+.filters button.on{color:var(--ink);border-bottom-color:var(--ink)}
+.filters .n{font-family:var(--mono);font-size:11px;color:var(--faint);margin-left:4px;font-weight:400}
+.draft textarea{width:100%;border:0;outline:0;resize:vertical;background:transparent;color:var(--ink);font:14.5px/1.7 var(--sans);padding:18px;min-height:170px;display:block}
+.draft .fwd textarea{padding:0;min-height:60px;font-size:14px}
+.draft textarea:focus{background:color-mix(in srgb,var(--accent-soft) 35%,transparent)}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn.sm{padding:5px 11px;font-size:12.5px;border-radius:8px}
+.btn.ok{background:var(--good);border-color:var(--good);color:#fff} .btn.ok:hover{opacity:.9;background:var(--good)}
+.saved{font-size:12px;color:var(--good)}
 footer{border-top:1px solid var(--line);color:var(--faint);font-size:12px}
 footer .wrap{display:flex;gap:16px;justify-content:space-between;padding-block:22px;flex-wrap:wrap}
 </style>
@@ -288,6 +330,8 @@ footer .wrap{display:flex;gap:16px;justify-content:space-between;padding-block:2
   </div>
   <nav class="tabs">
     <button class="on" data-tab="find">Find a path</button>
+    <button data-tab="accounts">Accounts</button>
+    <button data-tab="inbox">Inbox<span class="navn hide" id="inboxN"></span></button>
     <button data-tab="graph">Network</button>
   </nav>
   <div class="right">
@@ -322,6 +366,7 @@ footer .wrap{display:flex;gap:16px;justify-content:space-between;padding-block:2
         <div><small>03</small><b>Ask</b><span>Drafts a polite, double-opt-in intro request. Every claim in it is cited.</span></div>
       </div>
     </div>
+    <div class="recent hide" id="recent"><div class="label">Recent searches · reopen instantly, no credits <span class="grow"></span></div><div id="recentList"></div></div>
   </div>
 
   <div class="wrap results hide" id="results">
@@ -353,6 +398,34 @@ footer .wrap{display:flex;gap:16px;justify-content:space-between;padding-block:2
       <div id="r-paths"></div>
       <div id="r-drafts" class="hide"></div>
     </div>
+  </div>
+</section>
+
+<!-- ============================================================ ACCOUNTS -->
+<section id="tab-accounts" class="hide">
+  <div class="wrap page">
+    <h2>Account map</h2>
+    <p class="sub">Paste the accounts or people you want to reach, one per line. WarmPath finds the best warm route into each, so a sales or hiring team can plan a whole list at once.</p>
+    <textarea class="field" id="batchIn" placeholder="head of data at Swiggy&#10;VP engineering at Razorpay&#10;https://www.linkedin.com/in/someone"></textarea>
+    <div class="btnrow" style="margin-top:12px">
+      <button class="btn dark" id="batchGo">Map these accounts</button>
+      <span class="hint" style="margin:0">Up to 15 targets. Each one is a full verified search and uses credits.</span>
+    </div>
+    <div id="batchOut"></div>
+  </div>
+</section>
+
+<!-- ============================================================ INBOX -->
+<section id="tab-inbox" class="hide">
+  <div class="wrap page" style="max-width:860px">
+    <h2>Inbox</h2>
+    <p class="sub">Every intro WarmPath drafts waits here for a person. Edit the wording, then approve or reject it. Nothing is ever sent: approved drafts are saved to <span class="mono">outbox/</span> for you to send yourself.</p>
+    <div class="filters" id="ibFilters">
+      <button class="on" data-f="review">To review<span class="n" id="ibN-review"></span></button>
+      <button data-f="approved">Approved<span class="n" id="ibN-approved"></span></button>
+      <button data-f="rejected">Rejected<span class="n" id="ibN-rejected"></span></button>
+    </div>
+    <div id="ibList"><div class="empty">Loading…</div></div>
   </div>
 </section>
 
@@ -467,10 +540,16 @@ const font = () => ({face: "Inter, -apple-system, sans-serif", color: tok("--mut
 /* ------------------------------------------------------------ tabs */
 document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => {
   document.querySelectorAll("nav.tabs button").forEach(x => x.classList.toggle("on", x === b));
-  $("#tab-find").classList.toggle("hide", b.dataset.tab !== "find");
-  $("#tab-graph").classList.toggle("hide", b.dataset.tab !== "graph");
-  if (b.dataset.tab === "graph") loadGraph();
+  showTab(b.dataset.tab);
 });
+function showTab(name) {
+  document.querySelectorAll("nav.tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === name));
+  for (const t of ["find", "accounts", "inbox", "graph"]) $("#tab-" + t).classList.toggle("hide", t !== name);
+  if (name === "graph") loadGraph();
+  if (name === "inbox") loadInbox();
+  if (name === "find") loadRecent();
+  window.scrollTo({top: 0});
+}
 document.querySelectorAll("#rtabs button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#rtabs button").forEach(x => x.classList.toggle("on", x === b));
   $("#r-paths").classList.toggle("hide", b.dataset.r !== "paths");
@@ -611,6 +690,16 @@ function addWarning(msg, isErr) {
   const open = Object.values(state.steps).pop();   // also pin it under the step it happened in
   if (open) { const s = document.createElement("li"); s.className = "w"; s.textContent = msg; open.querySelector(".subs").appendChild(s); }
 }
+function chainHtml(p, seedIds) {      // person —85 ✓— person —72 ✓— target
+  const nodes = arr(p.nodes), ties = arr(p.ties), last = nodes.length - 1;
+  return nodes.map((n, j) => {
+    const cls = j === last ? "t" : (seedIds.has(n.person_id) || (j === 0 && p.via_seed)) ? "s" : "";
+    const t = ties[j];
+    const hop = j < last && t ? `<span class="hop ${t.verified ? "v" : ""}" title="${esc(t.verified ? t.verification || "verified" : "tie strength")}">` +
+      `<span class="ln"></span><b>${num(t.score, 0)}${t.verified ? " ✓" : ""}</b><span class="ln"></span></span>` : "";
+    return personHtml(n, cls) + hop;
+  }).join("");
+}
 function personHtml(n, cls) {
   return `<span class="person"><span class="av ${cls}">${esc(initials(n.name))}</span>${esc(n.name || "?")}</span>`;
 }
@@ -620,16 +709,18 @@ function renderPaths() {
   if (!state.paths.length) { box.innerHTML = `<div class="empty">${state.done ? noPathAdvice() : "No paths yet."}</div>`; return; }
   const seedIds = new Set(runNodes.get().filter(n => n.role === "seed").map(n => n.id));
   const open = new Set([...box.querySelectorAll(".path.open")].map(el => el.dataset.rank));
-  box.innerHTML = state.paths.sort((a, b) => (a.rank || 99) - (b.rank || 99)).map((p, i) => {
+  const sorted = state.paths.sort((a, b) => (b.via_seed ? 1 : 0) - (a.via_seed ? 1 : 0) || (a.rank || 99) - (b.rank || 99));
+  const hasMine = sorted.some(p => p.via_seed);
+  box.innerHTML = sorted.map((p, i) => {
     p.nodes = arr(p.nodes); p.ties = arr(p.ties);
-    const last = p.nodes.length - 1;
-    const chain = p.nodes.map((n, j) => personHtml(n, j === last ? "t" : seedIds.has(n.person_id) ? "s" : ""))
-                         .join('<span class="sep">→</span>');
+    const chain = chainHtml(p, seedIds);
+    const head = !hasMine ? "" : i === 0 ? '<div class="group"><b>Your paths</b> through people you know <span class="grow"></span></div>'
+      : (!p.via_seed && sorted[i - 1].via_seed) ? '<div class="group"><b>Other people who can introduce you</b><span class="grow"></span></div>' : "";
     const s = Math.max(0, Math.min(100, Math.round(Number(p.score) || 0)));
     const rank = String(p.rank ?? i + 1);
     const verified = p.ties.length && p.ties.every(t => t.verified);
     const isOpen = open.size ? open.has(rank) : i === 0;
-    return `<div class="path ${isOpen ? "open" : ""}" data-rank="${esc(rank)}">
+    return `${head}<div class="path ${isOpen ? "open" : ""}" data-rank="${esc(rank)}">
       <button class="row" type="button" aria-expanded="${isOpen}">
         <div class="num">${s}<small>${strength(s)}</small></div>
         <div style="min-width:0"><div class="chain">${chain}</div><div class="why">${esc(p.why)}</div></div>
@@ -640,6 +731,7 @@ function renderPaths() {
       <div class="detail">${p.ties.map(tieHtml).join("")}</div></div>`;
   }).join("");
 }
+$("#summary").addEventListener("click", ev => { if (ev.target.closest("[data-goinbox]")) { ibFilter = "review"; showTab("inbox"); } });
 $("#r-paths").addEventListener("click", ev => {
   const row = ev.target.closest(".row");
   if (!row) return;
@@ -661,11 +753,13 @@ function renderDrafts() {
       <pre>${esc(d.body)}</pre>
       <div class="fwd"><div class="k">Note for ${esc(d.to)} to forward</div><pre>${esc(d.forwardable_blurb)}</pre></div>
       <div class="ft"><span>Route #${esc(d.path_rank)}</span><span>Saved to outbox/ · never sent automatically</span>
+        ${state.runId ? `<span style="flex:1"></span><button class="linkbtn" data-review>Review in Inbox →</button>` : ""}
         ${bad.length ? `<span class="bad">Check: ${bad.map(esc).join(" · ")}</span>` : ""}</div>
     </article>`;
   }).join("") || '<div class="empty">No drafts for this request.</div>';
 }
 $("#r-drafts").addEventListener("click", async ev => {
+  if (ev.target.closest("button[data-review]")) { ibFilter = "review"; showTab("inbox"); return; }
   const b = ev.target.closest("button[data-copy]");
   if (!b) return;
   const d = state.drafts[Number(b.dataset.copy)];
@@ -685,7 +779,10 @@ function renderSummary(r) {
       <span><b>${r.paths.length}</b> route${r.paths.length === 1 ? "" : "s"}</span>
       <span><b>${r.audit.length}</b> API calls</span>
       <span><b>${num(r.credits_used, 2)}</b> credits</span>
-      <span><b>${num(r.elapsed_s)}s</b></span></div>`;
+      <span><b>${num(r.elapsed_s)}s</b></span></div>
+    ${state.runId ? `<div class="actions"><a href="/api/report/${encodeURIComponent(state.runId)}.md" target="_blank" rel="noopener">View cited brief</a>
+      <a href="/api/report/${encodeURIComponent(state.runId)}.md?download=1">Download brief (.md)</a>
+      ${arr(r.drafts).length ? '<button data-goinbox>Review drafts in Inbox</button>' : ""}</div>` : ""}`;
 }
 function renderAudit(audit, credits) {
   audit = arr(audit);
@@ -713,11 +810,11 @@ function handle(e) {
     case "done": {
       const r = e.result || {};
       r.paths = arr(r.paths); r.audit = arr(r.audit);
-      state.done = true; state.target = r.target || state.target;
+      state.done = true; state.target = r.target || state.target; state.runId = e.run_id || state.runId;
       if (r.paths.length || !state.paths.length) state.paths = r.paths;
       renderPaths(); renderSummary(r); renderAudit(r.audit, r.credits_used);
       arr(r.warnings).forEach(w => { if (![...$("#warns").children].some(d => d.textContent.includes(w))) addWarning(w); });
-      fitPad(runNet);
+      fitPad(runNet); refreshInboxCount(); loadRecent();
       break;
     }
     case "end": finish(true); break;
@@ -761,6 +858,129 @@ function start(q) {
 window.addEventListener("offline", () => { if (es) addWarning("Network connection lost."); });
 $("#askForm").onsubmit = ev => { ev.preventDefault(); start($("#q").value); };
 $("#chips").querySelectorAll(".chip").forEach(c => c.onclick = () => { $("#q").value = c.textContent; start(c.textContent); });
+
+/* ------------------------------------------------------------ history: reopen any past search for 0 credits */
+const ago = ts => { const m = Math.round((Date.now() / 1000 - ts) / 60); return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; };
+async function loadRecent() {
+  let rows = [];
+  try { rows = arr(await getJSON("/api/history?limit=6")); } catch { /* history is optional */ }
+  $("#recent").classList.toggle("hide", !rows.length);
+  $("#recentList").innerHTML = rows.map(h => `<button class="item" data-run="${esc(h.run_id)}">
+      <span class="q">${esc(h.request)}</span>
+      <span class="r">${h.target ? `${esc(h.target)} · ${h.paths} route${h.paths === 1 ? "" : "s"}${h.best != null ? " · best " + h.best : ""}` : "not resolved"} · ${ago(h.ts)}</span></button>`).join("");
+}
+$("#recentList").addEventListener("click", ev => { const b = ev.target.closest("[data-run]"); if (b) openRun(b.dataset.run); });
+async function openRun(runId) {
+  if (es) return;
+  let r;
+  try { r = await getJSON("/api/history/" + encodeURIComponent(runId)); }
+  catch (err) { showTab("find"); reset(); addWarning(err.message, true); finish(); return; }
+  showTab("find"); $("#q").value = r.request || "";
+  reset();
+  onStep({type: "step", id: "saved", status: "done", label: "Opened a saved search", detail: "From history · 0 credits · nothing re-fetched"});
+  if (r.target) addRunNode("target", r.target);
+  for (const p of arr(r.paths)) {
+    arr(p.nodes).forEach((n, j) => j < p.nodes.length - 1 && addRunNode(j === 0 && p.via_seed ? "seed" : "connector", n));
+    arr(p.ties).forEach(t => t.a && t.b && addRunEdge({a: t.a.person_id, b: t.b.person_id, score: t.score, label: t.kind}));
+  }
+  state.drafts = arr(r.drafts);
+  handle({type: "done", run_id: runId, result: r});
+  renderDrafts();
+  finish(true);
+}
+
+/* ------------------------------------------------------------ account map */
+let batchES;
+$("#batchGo").onclick = () => {
+  if (batchES) return;
+  const raw = $("#batchIn").value.trim();
+  if (!raw) { $("#batchIn").focus(); return; }
+  const out = $("#batchOut");
+  out.innerHTML = "";
+  $("#batchGo").disabled = true; $("#batchGo").textContent = "Mapping…";
+  const done = () => { batchES?.close(); batchES = null; $("#batchGo").disabled = false; $("#batchGo").textContent = "Map these accounts"; loadRecent(); refreshInboxCount(); };
+  const row = (i, html) => { const tr = $(`#br-${i}`); if (tr) tr.innerHTML = html; };
+  batchES = new EventSource("/api/batch?" + new URLSearchParams({targets: raw}));
+  batchES.onmessage = m => {
+    let e; try { e = JSON.parse(m.data); } catch { return; }
+    if (e.type === "batch_start") {
+      out.innerHTML = `<div class="tblwrap"><table class="tbl"><thead><tr><th>Account</th><th>Target</th><th>Best route</th><th>Strength</th></tr></thead><tbody>${
+        arr(e.requests).map((q, i) => `<tr id="br-${i}"><td>${esc(q)}</td><td colspan="3"><span class="state">Waiting</span></td></tr>`).join("")}</tbody></table></div>`;
+    } else if (e.type === "batch") {
+      const q = `<td>${esc(e.request)}</td>`;
+      if (e.state === "running" || e.state === "step") row(e.i, `${q}<td colspan="3"><span class="state run">${esc(e.label || "Starting")}</span></td>`);
+      else if (e.state === "skipped" || e.state === "error") row(e.i, `${q}<td colspan="3"><span class="state" style="color:var(--bad)">${esc(e.message || "failed")}</span></td>`);
+      else if (e.state === "done") {
+        const tr = $(`#br-${e.i}`);
+        if (tr && e.run_id) { tr.classList.add("click"); tr.dataset.run = e.run_id; tr.title = "Open the full result"; }
+        row(e.i, `${q}<td>${e.target ? `<span style="font-weight:500">${esc(e.target)}</span><div class="muted" style="font-size:12.5px">${esc([e.title, e.company].filter(Boolean).join(" at "))}</div>` : '<span class="muted">Not found</span>'}</td>
+          <td>${arr(e.chain).length > 1 ? e.chain.map(esc).join(' <span class="sep">→</span> ') + (e.via_seed ? ' <span class="pill ok" style="margin-left:4px">Your network</span>' : "") : '<span class="muted">No warm route yet</span>'}</td>
+          <td>${e.score != null ? `<span class="big">${esc(e.score)}</span> <span class="muted" style="font-size:12px">${strength(e.score)}${e.verified ? " · verified" : ""}</span>` : "–"}</td>`);
+      }
+    } else if (e.type === "error") {
+      out.insertAdjacentHTML("afterbegin", `<div class="alert e" style="margin-top:18px"><span class="i">×</span><span>${esc(e.message)}</span></div>`);
+    } else if (e.type === "end") done();
+  };
+  batchES.onerror = () => { if (batchES) { out.insertAdjacentHTML("beforeend", '<div class="hint" style="color:var(--bad)">Lost the connection to the server, so the account map stopped.</div>'); done(); } };
+};
+$("#batchOut").addEventListener("click", ev => { const tr = ev.target.closest("tr[data-run]"); if (tr) openRun(tr.dataset.run); });
+
+/* ------------------------------------------------------------ inbox: a person approves, WarmPath never sends */
+let ibFilter = "review", ibItems = [];
+async function refreshInboxCount() {
+  try {
+    const r = await getJSON("/api/inbox");
+    ibItems = arr(r.items);
+    const n = r.counts?.review || 0;
+    $("#inboxN").textContent = n; $("#inboxN").classList.toggle("hide", !n);
+    for (const k of ["review", "approved", "rejected"]) $("#ibN-" + k).textContent = r.counts?.[k] || 0;
+    return true;
+  } catch { return false; }
+}
+async function loadInbox() {
+  document.querySelectorAll("#ibFilters button").forEach(x => x.classList.toggle("on", x.dataset.f === ibFilter));
+  if (!await refreshInboxCount()) { $("#ibList").innerHTML = '<div class="empty">Couldn\'t load the inbox. Is the server running?</div>'; return; }
+  const items = ibItems.filter(x => x.status === ibFilter);
+  $("#ibList").innerHTML = items.map(d => {
+    const bad = arr(d.claims_unsupported);
+    return `<article class="draft" data-key="${esc(d.key)}">
+      <div class="dh"><span class="to">To ${esc(d.to)}</span><span class="subj">${esc(d.subject)}</span><span class="sp"></span>
+        ${d.edited ? '<span class="pill" title="Your wording is not re-checked against the evidence. Make sure every fact still holds.">edited · not re-checked</span>'
+          : `<span class="pill ${bad.length ? "bad" : "ok"}">${bad.length ? `${bad.length} unsupported` : `${esc(d.claims_checked)} claims cited`}</span>`}</div>
+      <textarea data-f="body" aria-label="Message body">${esc(d.body)}</textarea>
+      <div class="fwd"><div class="k">Note for ${esc(d.to)} to forward</div><textarea data-f="forwardable_blurb" aria-label="Forwardable note">${esc(d.forwardable_blurb)}</textarea></div>
+      <div class="ft" style="align-items:center">
+        <span>For “${esc(d.request)}” · ${ago(d.ts)}</span>
+        <a class="linkbtn" href="/api/report/${encodeURIComponent(d.run_id)}.md" target="_blank" rel="noopener">Sources</a>
+        <span style="flex:1"></span><span class="saved"></span>
+        <div class="btnrow">
+          ${d.status !== "rejected" ? '<button class="btn sm" data-act="rejected">Reject</button>' : ""}
+          ${d.status !== "review" ? '<button class="btn sm" data-act="review">Back to review</button>' : ""}
+          <button class="btn sm" data-act="save">Save edits</button>
+          ${d.status !== "approved" ? '<button class="btn sm ok" data-act="approved">Approve</button>' : '<button class="btn sm" data-act="copy">Copy</button>'}
+        </div></div></article>`;
+  }).join("") || `<div class="empty">${ibFilter === "review" ? "Nothing waiting for review. Run a search and its drafts land here." : "Nothing here yet."}</div>`;
+}
+$("#ibFilters").addEventListener("click", ev => { const b = ev.target.closest("button[data-f]"); if (b) { ibFilter = b.dataset.f; loadInbox(); } });
+$("#ibList").addEventListener("click", async ev => {
+  const b = ev.target.closest("button[data-act]");
+  if (!b) return;
+  const card = b.closest("[data-key]"), act = b.dataset.act, note = card.querySelector(".saved");
+  const body = card.querySelector('[data-f="body"]').value, blurb = card.querySelector('[data-f="forwardable_blurb"]').value;
+  if (act === "copy") {
+    try { await navigator.clipboard.writeText(`${body}\n\n---\n${blurb}`); b.textContent = "Copied"; } catch { b.textContent = "Copy failed"; }
+    return setTimeout(() => b.textContent = "Copy", 1500);
+  }
+  b.disabled = true;
+  try {
+    const res = await fetch("/api/inbox", {method: "POST", headers: {"content-type": "application/json"},
+      body: JSON.stringify({key: card.dataset.key, body, forwardable_blurb: blurb, ...(act === "save" ? {} : {status: act})})});
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || j.detail || `HTTP ${res.status}`);
+    if (act === "save") { note.style.color = ""; note.textContent = "Saved"; b.disabled = false; setTimeout(() => note.textContent = "", 1500); }
+    else loadInbox();
+  } catch (err) { note.style.color = "var(--bad)"; note.textContent = err.message; b.disabled = false; }
+});
 
 /* ------------------------------------------------------------ audit sheet */
 const drawer = open => { $("#drawer").classList.toggle("open", open); $("#scrim").classList.toggle("open", open); };
@@ -905,7 +1125,7 @@ $("#crawlGo").onclick = () => {
 };
 
 /* ------------------------------------------------------------ boot */
-initRunGraph(); refreshStatus();
+initRunGraph(); refreshStatus(); loadRecent(); refreshInboxCount();
 </script>
 </body>
 </html>

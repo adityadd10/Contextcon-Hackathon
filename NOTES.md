@@ -155,3 +155,12 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
 - 13:55 · B · ⚠ for Aditya: fake mode shares `.cache/crust` with live runs. After a live "Swiggy" lookup, a fake run
   gets the real id 5702 and finds nobody. Record fake-mode demos with `WARMPATH_CACHE=0` or a separate
   `WARMPATH_CACHE_DIR` (better: key the cache by mode in crust.py).
+- 12:45 · Apurba · product features that turn the tool into a service: **Inbox** (a human edits, approves or rejects each draft;
+  approved text is saved to outbox/, nothing is sent; edited drafts are marked "not re-checked" because human wording
+  isn't fact-checked), **Account map** (up to 15 targets → best verified route each; one bad row doesn't stop the batch),
+  **History** (reopen any run from reports/ for 0 credits), **cited Markdown brief** per run, and **deploy guardrails**
+  (optional access key, per-visitor rate limit, daily credit cap, CSP). Also from UPDATES 12:27: "Your paths" vs
+  "Other people who can introduce you", with a score and ✓ on every hop.
+- 12:45 · Apurba · how the server learns the run_id without touching pipeline.py: the pipeline writes reports/<run_id>.json
+  *before* emitting `done`, so the server matches the newest report for the same request and tags `done` with it.
+  8 new tests (114 total).

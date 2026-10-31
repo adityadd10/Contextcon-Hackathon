@@ -247,3 +247,95 @@ def test_mcp_pipeline_crash_is_reported(monkeypatch):
         raise RuntimeError("upstream down")
     monkeypatch.setattr(pl, "run", boom)
     assert "upstream down" in call("find_warm_paths", request="anyone at Swiggy")["error"]
+
+
+# ------------------------------------------------------------------ workspace: history, brief, inbox, account map, guardrails
+
+def _run_once(client, q="intro to Priya Sharma at Swiggy") -> str:
+    done = [e for e in events(client.get("/api/run", params={"q": q})) if e["type"] == "done"][0]
+    assert done["run_id"]
+    return done["run_id"]
+
+
+def test_history_and_brief(client):
+    assert client.get("/api/history").json() == []
+    run_id = _run_once(client)
+    h = client.get("/api/history").json()
+    assert h[0]["run_id"] == run_id and h[0]["target"] == "Priya Sharma"
+    full = client.get(f"/api/history/{run_id}").json()
+    assert full["paths"] and full["run_id"] == run_id
+    md = client.get(f"/api/report/{run_id}.md").text
+    assert md.startswith("# Warm intro brief: Priya Sharma") and "Sources:" in md and "## Audit trail" in md
+    dl = client.get(f"/api/report/{run_id}.md", params={"download": 1})
+    assert "attachment" in dl.headers["content-disposition"]
+
+
+def test_history_survives_corrupt_report_and_rejects_traversal(client, tmp_path):
+    (tmp_path / "reports").mkdir()
+    (tmp_path / "reports" / "broken.json").write_text("{not json")
+    assert client.get("/api/history").json() == []
+    assert client.get("/api/history/..%2F..%2Fetc").status_code == 404
+    assert client.get("/api/report/a.b.md").status_code == 404
+
+
+def test_inbox_review_flow(client, tmp_path):
+    run_id = _run_once(client)
+    box = client.get("/api/inbox").json()
+    key = box["items"][0]["key"]
+    assert box["counts"]["review"] >= 1 and key.startswith(run_id)
+    r = client.post("/api/inbox", json={"key": key, "status": "approved", "body": "Edited by a person."}).json()
+    assert r["status"] == "approved" and r["body"] == "Edited by a person."
+    approved = list((tmp_path / "outbox").glob("*.approved.md"))
+    assert approved and "Edited by a person." in approved[0].read_text() and "not sent" in approved[0].read_text()
+    item = next(i for i in client.get("/api/inbox").json()["items"] if i["key"] == key)
+    assert item["edited"] and item["status"] == "approved"
+    client.post("/api/inbox", json={"key": key, "status": "rejected"})
+    assert not list((tmp_path / "outbox").glob("*.approved.md"))      # un-approving removes the approved copy
+    assert client.post("/api/inbox", json={"key": key, "status": "sent"}).status_code == 400
+    assert client.post("/api/inbox", json={"key": key, "body": "x" * 6000}).status_code == 400
+    assert client.post("/api/inbox", json={"key": "nope:1"}).status_code == 404
+    assert client.post("/api/inbox", json={"key": 5}).status_code == 400
+
+
+def test_account_map_streams_one_row_per_unique_target(client):
+    evs = events(client.get("/api/batch", params={
+        "targets": "intro to Priya Sharma at Swiggy\n\nINTRO TO PRIYA SHARMA AT SWIGGY\nasdfgh qwerty\n# a comment"}))
+    rows = [e for e in evs if e["type"] == "batch" and e["state"] in ("done", "error")]
+    assert [r["i"] for r in rows] == [0, 1]
+    assert rows[0]["target"] == "Priya Sharma" and rows[0]["score"] and rows[0]["run_id"]
+    assert rows[1]["target"] is None and rows[1]["routes"] == 0
+    assert evs[-1]["type"] == "end"
+
+
+def test_account_map_limits(client):
+    assert types(events(client.get("/api/batch", params={"targets": "  \n "}))) == ["error", "end"]
+    many = "\n".join(f"head of data at company{i}" for i in range(20))
+    assert "too many" in events(client.get("/api/batch", params={"targets": many}))[0]["message"]
+
+
+def test_access_key_rate_limit_and_daily_cap(client, monkeypatch):
+    g = server.ws.Guard()
+    monkeypatch.setattr(server, "guard", g)
+    g.key = "s3cret"
+    assert client.get("/api/graph/stats").status_code == 401
+    assert client.get("/").status_code == 401
+    assert client.get("/api/health").status_code == 200                   # health stays open for the host's checks
+    assert client.get("/", params={"key": "wrong"}, follow_redirects=False).status_code == 401
+    r = client.get("/", params={"key": "s3cret"}, follow_redirects=False)
+    assert r.status_code == 303 and "wp_key" in r.headers["set-cookie"]
+    assert client.get("/api/graph/stats", headers={"x-warmpath-key": "s3cret"}).status_code == 200
+    g.key, g.rate = "", 2
+    assert "error" not in types(events(client.get("/api/run", params={"q": "intro to Priya Sharma at Swiggy"})))
+    events(client.get("/api/run", params={"q": "intro to Priya Sharma at Swiggy"}))
+    third = events(client.get("/api/run", params={"q": "intro to Priya Sharma at Swiggy"}))
+    assert types(third) == ["error", "end"] and "Too many" in third[0]["message"]
+    assert "done" in types(events(client.get("/api/run", params={"mock": 1})))   # replay is free, never limited
+    g.rate, g.daily = 0, 1.0
+    g.record(5)
+    capped = events(client.get("/api/run", params={"q": "intro to Priya Sharma at Swiggy"}))
+    assert "credit cap" in capped[0]["message"]
+
+
+def test_security_headers(client):
+    h = client.get("/").headers
+    assert h["x-frame-options"] == "DENY" and "default-src 'self'" in h["content-security-policy"]
