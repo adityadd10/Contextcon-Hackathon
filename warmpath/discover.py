@@ -59,8 +59,24 @@ def rank_stints(target: Person, limit: int = MAX_STINTS) -> list[Stint]:
     return out[:limit]
 
 
+ABBREV = {"IIT": "Indian Institute of Technology", "IIM": "Indian Institute of Management",
+          "IIIT": "International Institute of Information Technology", "NIT": "National Institute of Technology",
+          "BITS": "Birla Institute of Technology and Science"}
+
+
+def school_variants(name: str) -> list[str]:
+    """'IIT Bombay' → also 'Indian Institute of Technology Bombay' (profiles use both spellings)."""
+    out = [name]
+    for short, long in ABBREV.items():
+        if name.upper().startswith(short + " "):
+            out.append(long + name[len(short):])
+        elif name.lower().startswith(long.lower()):
+            out.append(short + name[len(long):].replace(",", ""))
+    return out
+
+
 async def network_filter(c: Crust, spec: TargetSpec, emit: Emit) -> dict | None:
-    conds = [f("education.schools.school", "(.)", s) for s in spec.network.schools]
+    conds = [f("education.schools.school", "(.)", v) for s in spec.network.schools for v in school_variants(s)]
     if spec.network.companies:
         cos = await asyncio.gather(*(resolve_company(c, n, emit) for n in spec.network.companies))
         ids = [co.company_id for co in cos if co and co.company_id]

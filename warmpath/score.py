@@ -102,7 +102,7 @@ def score_tie(a: Person, b: Person) -> Tie:
                                   f"Also worked together at {extra.company_name} ({extra.months:.0f} mo)"))
     for sa in a.schools:
         for sb in b.schools:
-            if fuzz.token_set_ratio(sa.name, sb.name) >= 90 and _years_overlap(sa, sb):
+            if _same_school(sa.name, sb.name) and _years_overlap(sa, sb):
                 factors.append(Factor("classmates", sa.name, 15, f"Studied at {sa.name} at the same time", [
                     Evidence(f"{a.name}: {sa.name}", "crustdata", a.source_endpoint, sa.ref, a.profile_url),
                     Evidence(f"{b.name}: {sb.name}", "crustdata", b.source_endpoint, sb.ref, b.profile_url)]))
@@ -110,6 +110,13 @@ def score_tie(a: Person, b: Person) -> Tie:
     score = min(100.0, sum(fct.contribution for fct in factors))
     kind = "colleague" if overlaps else ("classmate" if any(f.name == "classmates" for f in factors) else "colleague")
     return Tie(a=a, b=b, score=round(score, 1), factors=factors, overlaps=overlaps, kind=kind)
+
+
+def _same_school(a: str, b: str) -> bool:
+    from .discover import school_variants
+    va = {v.lower().replace(",", "") for v in school_variants(a)}
+    vb = {v.lower().replace(",", "") for v in school_variants(b)}
+    return bool(va & vb) or fuzz.token_set_ratio(a, b) >= 90
 
 
 def _years_overlap(x, y) -> bool:

@@ -50,18 +50,23 @@ class BudgetExceeded(CrustError):
 
 class Crust:
     def __init__(self, api_key: str | None = None, budget: float | None = None,
-                 use_cache: bool | None = None, timeout: float = 45.0):
+                 use_cache: bool | None = None, timeout: float = 45.0,
+                 transport: httpx.AsyncBaseTransport | None = None, pace: bool = True):
+        if transport is None and os.getenv("WARMPATH_FAKE") == "1":
+            from .fake import FakeCrust  # offline demo world: no key, no credits
+            transport, api_key, pace = FakeCrust(fail_first_with_429=False).transport(), "fake", False
         self.api_key = api_key or os.getenv("CRUSTDATA_API_KEY", "")
         if not self.api_key:
-            raise RuntimeError("CRUSTDATA_API_KEY missing — put it in .env")
+            raise RuntimeError("CRUSTDATA_API_KEY missing: put it in .env (or WARMPATH_FAKE=1 for the offline demo world)")
         self.budget = budget if budget is not None else float(os.getenv("WARMPATH_BUDGET", "60"))
         self.use_cache = use_cache if use_cache is not None else os.getenv("WARMPATH_CACHE", "1") == "1"
+        self.pace = pace
         self.audit: list[CallRecord] = []
         self.credits_used = 0.0
         self._last_call: dict[str, float] = {}
         self._locks: dict[str, asyncio.Lock] = {}
         self._client = httpx.AsyncClient(
-            base_url=BASE_URL, timeout=timeout,
+            base_url=BASE_URL, timeout=timeout, transport=transport,
             headers={"authorization": f"Bearer {self.api_key}", "x-api-version": API_VERSION,
                      "content-type": "application/json"},
         )
@@ -88,7 +93,8 @@ class Crust:
         if self.credits_used + est_credits > self.budget:
             raise BudgetExceeded(402, f"run budget {self.budget} credits would be exceeded", endpoint)
 
-        await self._pace(endpoint)
+        if self.pace:
+            await self._pace(endpoint)
         last_err: CrustError | None = None
         for attempt in range(4):
             try:
@@ -99,7 +105,8 @@ class Crust:
                 continue
             credits = _float(r.headers.get("x-credits-used"))
             if r.status_code == 429 or r.status_code >= 500:
-                retry_after = _float(r.headers.get("retry-after")) or 2.0 * (attempt + 1)
+                ra = r.headers.get("retry-after")
+                retry_after = _float(ra) if ra is not None else 2.0 * (attempt + 1)
                 last_err = CrustError(r.status_code, r.text[:300], endpoint)
                 await asyncio.sleep(min(retry_after, 20))
                 continue

@@ -135,6 +135,11 @@ cp .env.example .env        # paste YOUR CRUSTDATA_API_KEY and OPENROUTER_API_KE
 uv run --with pytest pytest -q tests      # should be all green
 uv run warmpath graph stats               # sanity check: prints an empty graph
 ```
+**No key yet, or don't want to spend credits?** `WARMPATH_FAKE=1` runs everything against an offline fake Crustdata
+world (`warmpath/fake.py`: Swiggy, a 30-person startup, Flipkart, two people called "Priya Sharma", IIT Bombay alumni,
+a redacted profile). Try:
+`WARMPATH_FAKE=1 WARMPATH_SEEDS=https://www.linkedin.com/in/aditya-seed uv run warmpath "warm intro to whoever runs data at Swiggy via IITB"`
+Apurba: build the UI against this. Vaibhav: the offline end-to-end tests in `tests/test_pipeline_offline.py` use it.
 Vaibhav and Apurba: ask Aditya to add you as a collaborator on GitHub (repo → Settings → Collaborators) so you can push.
 
 ### 5.3 Start your Claude Code
