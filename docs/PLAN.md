@@ -42,6 +42,31 @@ role to a canonical company ID with dates, which is the identity graph the track
 
 Rule from the event: **nothing is sent to real people.** Drafts go to `outbox/` only.
 
+## 2b. The WarmPath social graph (persistent, grows with every run)
+
+Think of it as a LinkedIn-style connection graph built from Crustdata's canonical IDs instead of self-reported
+"connections". It lives in `warmpath/graphdb.py`: SQLite property graph (no server, survives restarts) plus networkx
+algorithms, with Cypher export for Neo4j.
+
+```
+(:Person)-[:WORKED_AT {title,start,end}]->(:Company {crustdata_company_id})
+(:Person)-[:STUDIED_AT {degree,start,end}]->(:School)
+(:Person)-[:KNOWS {weight 0-100, factors, evidence}]-(:Person)      ← derived, never self-reported
+```
+- **Self-densifying:** when any person is ingested, they're scored against everyone already in the graph who shares a
+  `company_id` or school, and KNOWS edges appear automatically.
+- **Graph memory:** each run first recalls people already in the graph at the target's employers (0 credits), then
+  writes back everything it learns. The 10th query is cheaper and better than the 1st.
+- **Multi-hop:** Dijkstra over cost `-ln(score/100)` gives the *strongest* chain, not just the shortest, up to 4 hops
+  (you → ex-colleague → their ex-colleague → target).
+- **Crawler:** `warmpath crawl --seeds <your team's URLs> --depth 2 --budget 80` builds your team's network
+  breadth-first over shared employers.
+- **Algorithms:** degrees of separation, super-connectors (betweenness = best intro brokers), communities
+  (alumni/ex-company clusters), ego subgraph for the UI, Neo4j export.
+- **Provenance on every edge:** the KNOWS edge stores its factors plus Evidence (record refs and URLs), so the graph is auditable.
+
+CLI: `warmpath graph stats | knows <person_id> | path <from_id> <to_id> | brokers | export`
+
 ## 3. Tie-strength model (explainable, every factor cites evidence)
 
 | Factor | Points | Evidence |
@@ -79,6 +104,9 @@ Score = min(100, sum). Path score = `0.7 × weakest tie + 0.3 × mean tie`, × `
 13. **MCP server** exposing `find_warm_paths`, `explain_tie(a,b)`, `resolve_person` so any agent (Claude Desktop/Code) can use WarmPath
 14. **Eval harness** (credibility with judges): take N real companies → founders from `/company/enrich people.founders`.
     For each founder, is their real co-founder WarmPath's #1 connector? Report top-1/top-3 accuracy versus a "random colleague" baseline
+15a. **Social graph explorer** (UI tab): the whole graph or the ego network of a person, coloured by company or
+    community, sized by betweenness. Click an edge for its evidence. "Path between any two people" box.
+15b. **Crawl your network** button: seeds from the team → graph grows live on screen (great demo moment)
 15. **Audit trail**: every API call logged with request, credits (`x-credits-used`) and response sha256, downloadable as JSON
 
 ### Stretch (only if ahead)
@@ -91,9 +119,9 @@ Score = min(100, sum). Path score = `0.7 × weakest tie + 0.3 × mean tie`, × `
 
 | | **Member A (Aditya): data and graph core + integration** | **Member B: intelligence** | **Member C: product, UI and demo** |
 |---|---|---|---|
-| Owns | `warmpath/crust.py`, `resolve.py`, `discover.py`, `pipeline.py` | `parse.py`, `score.py`, `paths.py`, `webproof.py`, `draft.py`, `eval/` | `server.py`, `static/*`, `cli.py`, `mcp_server.py`, `README.md`, demo video |
+| Owns | `warmpath/crust.py`, `resolve.py`, `discover.py`, `pipeline.py`, **`graphdb.py`, `crawl.py`** | `parse.py`, `score.py`, `paths.py`, `webproof.py`, `draft.py`, `eval/` | `server.py`, `static/*`, `cli.py`, `mcp_server.py`, `README.md`, demo video |
 | MVP | Resolve target; connector search; seeds; enrich; budget/caching | LLM + rule parser; tie scoring; path ranking; drafts + claim check | FastAPI SSE server; single-page UI with graph (vis-network via CDN); CLI with rich; mock events |
-| Then | Freshness guard; batch mode; watcher | Web proof; eval harness + metrics table | MCP server; demo script; record video; README with architecture diagram |
+| Then | Graph: crawl the team's network, tune derived ties, graph API helpers; freshness guard | Web proof; eval harness + metrics table | **Graph Explorer tab** (`/api/graph/*`, see §6) + "crawl" button; MCP server; demo video; README |
 
 Shared contracts (agree before changing):
 - `warmpath/models.py`: all dataclasses. Add fields freely; **don't rename or remove** without telling the team.
@@ -131,6 +159,16 @@ def build_paths(target: Person, connectors: list[Person], seeds: list[Person], s
 # draft.py (B)
 async def draft_intro(path: IntroPath, spec: TargetSpec) -> Draft
 
+# graphdb.py (A): GraphStore(path="data/graph.db")
+g.upsert_person(p) -> {"new": bool, "ties": int}      g.upsert_tie(tie)      g.person(person_id)
+g.people_at([company_ids]) -> list[Person]            g.knows(person_id) -> [(Person, weight, props)]
+g.strongest_path(a_id, b_id, max_hops) -> [ids]|None  g.degrees_of_separation(a_id, b_id)
+g.super_connectors(top) / g.communities() / g.stats() / g.export_cypher()
+g.subgraph(center="person:123"|None, depth=2) -> {"nodes":[{id,type,label}], "edges":[{src,dst,type,weight,props}]}
+
+# crawl.py (A)
+async def crawl(c: Crust, g: GraphStore, seed_urls: list[str], depth=1, emit=noop) -> dict
+
 # pipeline.py (A): the single entry point used by server, cli and mcp
 async def run(request: str, emit: Emit | None = None, **opts) -> RunResult
 ```
@@ -143,9 +181,14 @@ async def run(request: str, emit: Emit | None = None, **opts) -> RunResult
 {"type":"path","path":{...IntroPath}}
 {"type":"draft","draft":{...Draft}}
 {"type":"warning","message":"Target profile last updated 140 days ago"}
+{"type":"graph","stats":{"people":120,"relationships":340,...}}
 {"type":"done","result":{...RunResult}}
 {"type":"error","message":"..."}
 ```
+Server endpoints for the graph explorer (Member C, thin wrappers over GraphStore):
+`GET /api/graph/stats` · `GET /api/graph/subgraph?center=person:123&depth=2` · `GET /api/graph/path?a=1&b=2`
+· `GET /api/graph/brokers` · `GET /api/crawl?seeds=url,url&depth=1` (SSE, same event schema).
+
 Member C: write `fixtures/mock_events.jsonl` first, matching this schema, so the UI can be built before the backend works.
 
 ## 7. Timeline (IST)
@@ -158,6 +201,7 @@ Member C: write `fixtures/mock_events.jsonl` first, matching this schema, so the
 | 13:30 | Mentor checkpoint: show the live UI run |
 | 13:30–14:30 | Differentiators (seeds 2-hop, web proof, MCP, eval) |
 | **14:30** | **Feature freeze.** Warm the cache for 3 demo queries |
+| 14:00 | Run `warmpath crawl` on the team's profiles so the graph is big for the demo |
 | 14:30–15:10 | Record the 2-min video (script below), write the README |
 | 15:15 | Final push, submit repo + video (deadline 15:30) |
 
@@ -167,6 +211,8 @@ Member C: write `fixtures/mock_events.jsonl` first, matching this schema, so the
 2. (0:15–1:15) Type the request live → steps stream in → the graph builds → top 3 paths with scores.
    Click an edge: both Crustdata records, the overlap dates, company size at the time, the web co-mention link.
 3. (1:15–1:40) Open the draft in the outbox: every claim is ticked against the evidence. Show the audit trail (calls, credits, hashes).
+3b. Graph tab: "this is the network WarmPath has learned, N people and M verified relationships". Ask for a path
+   between two people from different worlds: a 3-hop chain appears with the evidence on every hop.
 4. (1:40–2:00) Robustness and eval: a messy input with a typo still resolves, plus "co-founder recovered as #1 connector in X/N companies". Close with the MCP tool used from Claude.
 
 ## 9. Crustdata API notes (verified from the docs)
@@ -199,4 +245,7 @@ Member C: write `fixtures/mock_events.jsonl` first, matching this schema, so the
 > SSE events from pipeline.run, or replays the mock file when ?mock=1) and static/index.html: a single page, no build step,
 > vis-network from cdnjs. Live step list, a graph (target in the centre, connectors around, seeds outside, edge width = tie
 > score), path cards with clickable citations, a drafts tab, an audit drawer. Make it look polished for a demo video.
+> Add a "Graph" tab: vis-network over GET /api/graph/subgraph (people = dots coloured by community or current company,
+> companies/schools = squares, KNOWS edge width = weight, click an edge to show its factors and evidence), a path box
+> (two people → /api/graph/path), a "super-connectors" list, and a "Crawl my network" button streaming /api/crawl.
 > Then cli.py (rich live output) and mcp_server.py (mcp package, tools find_warm_paths / explain_tie).
