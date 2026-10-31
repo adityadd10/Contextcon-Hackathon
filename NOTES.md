@@ -221,3 +221,7 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
   trailing city was read as part of the name → strip a trailing place only when the full name isn't itself a company (first try
   broke "Bank of India" → "Bank of"; caught by our own test). Also made `warmpath serve` live by default (a leftover
   WARMPATH_FAKE in the shell had silently put the UI on demo data).
+- 15:15 · Aditya · live sweep finished: 17/22 → after fixes 20/22 with verified paths, 0 crashes, 0 errors. Fixed: "cofounder"
+  vs stored "Co-Founder" (founder roles now use the leadership search); "TCS" exact-matched a small namesake → alias list for
+  common abbreviations (TCS, L&T, SBI, HUL, AWS…). Remaining 2 are data limits, explained in the UI (role has no dates; no
+  matching title on record).

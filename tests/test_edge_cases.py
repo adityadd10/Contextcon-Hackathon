@@ -132,3 +132,11 @@ def test_city_suffix_only_stripped_when_full_name_is_not_a_company(q):
             return await resolve_company(c, q, lambda e: None)
     co = asyncio.run(go())
     assert co and co.name == {"Uber Bangalore": "Uber", "Bank of India": "Bank of India"}[q]
+
+
+def test_company_abbreviations_and_founder_roles():
+    from warmpath.resolve import COMPANY_ALIASES
+    assert COMPANY_ALIASES["tcs"] == "Tata Consultancy Services" and COMPANY_ALIASES["l&t"] == "Larsen & Toubro"
+    import re as _re
+    for role in ["cofounder", "co-founder", "co founder", "founder"]:
+        assert _re.search(r"co-?\s?founder|founder", role)

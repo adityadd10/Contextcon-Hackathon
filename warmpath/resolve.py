@@ -23,11 +23,22 @@ PLACES = re.compile(r"[\s,\-]+(?:in\s+)?(?:bangalore|bengaluru|mumbai|bombay|del
 LEGAL = re.compile(r"\b(inc|llc|ltd|limited|pvt|private|corp|corporation|technologies|technology|labs|co)\b\.?", re.I)
 
 
+COMPANY_ALIASES = {"tcs": "Tata Consultancy Services", "hul": "Hindustan Unilever", "l&t": "Larsen & Toubro",
+                   "lnt": "Larsen & Toubro", "sbi": "State Bank of India", "ril": "Reliance Industries",
+                   "m&m": "Mahindra & Mahindra", "aws": "Amazon Web Services", "fb": "Meta", "facebook": "Meta",
+                   "jpmc": "JPMorgan Chase", "jpm": "JPMorgan Chase", "gs": "Goldman Sachs", "ms": "Microsoft",
+                   "hcl": "HCLTech", "bcg": "Boston Consulting Group", "pwc": "PwC", "ey": "EY"}
+
+
 async def resolve_company(c: Crust, query: str, emit: Emit) -> Company | None:
     """Resolve a messy company mention. Fallback chain, cheapest first:
     identify(as typed) → identify(cleaned name) → identify(guessed domains) → web search for the company page →
     identify(profile URL). Identify calls are free; the web search costs 1 credit."""
     q = query.strip().strip(".,")
+    alias = COMPANY_ALIASES.get(q.lower())
+    if alias and alias.lower() != "meta":  # Facebook already resolves directly; keep the user's word for it
+        ev.step(emit, "resolve", "progress", f"Reading '{q}' as '{alias}'")
+        q = alias
     tried: list[str] = []
 
     async def attempt(label: str, **kw) -> list[dict]:
@@ -158,6 +169,8 @@ async def resolve_target(c: Crust, spec: TargetSpec, emit: Emit) -> tuple[Person
         topic_word = max(topic, key=len) if topic else spec.role
         senior = any_of(*(f("experience.employment_details.current.title", "[.]", w)
                           for w in ("head", "vp", "vice president", "director", "chief", "lead", "principal")))
+        if re.search(r"co-?\s?founder|founder", spec.role):  # "cofounder" ≠ stored "Co-Founder": use the leadership search
+            spec.role = "founder ceo"
         if spec.role == "founder ceo":
             attempts = [("leadership title", any_of(*(f("experience.employment_details.current.title", "[.]", w)
                                                      for w in ("founder", "ceo", "chief executive", "managing director"))), 25)]
