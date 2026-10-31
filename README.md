@@ -178,7 +178,26 @@ uv run python -m eval.cofounder_eval --offline   # re-score saved data, 0 credit
   random colleague (exact expectation), "longest overlap only", and WarmPath without the title factor (co-founders
   often share a "Co-founder" title, which would flatter us). Equal scores count against us.
 
-  _Results: TODO, paste the table from `eval/results.md` after the live run._
+  **Results (live Crustdata, 31 Oct, 25 credits):** 32 founders across 11 startups, ~24 candidates each.
+
+  | Method | Hit@1 | Hit@3 |
+  |---|---|---|
+  | **WarmPath** | **91%** | **94%** |
+  | WarmPath without the title factor | 91% | 94% |
+  | Longest overlap only | 88% | 94% |
+  | Random colleague | 9% | 25% |
+
+  The no-title ablation scores the same, so a shared "Co-founder" title isn't what wins. Co-founders are the easy
+  case for "longest overlap"; WarmPath matches it here while also discounting big-company strangers, which overlap
+  alone can't do. The misses are instructive: Nikhil Kamath's #1 pick is Richard Pattle, his co-founder at True
+  Beacon (a real warm tie, just not the one the eval wanted). Two Licious profiles with founder titles share no dated
+  overlap with the other founders. Per-founder table: [eval/results.md](eval/results.md).
+
+  Ground truth needed work: Crustdata's `people.founders` lists "Founder's Office" staff and EAs (12 of 14 at
+  Razorpay), plus one-job profiles claiming to have founded Zomato with no dates. A co-founder here means a founder
+  title *at that company* that started within 2 years of its founding. The rule is applied to everyone in the pool
+  (it recovers Unacademy's Hemesh Singh and Urban Company's Abhiraj Singh Bhal, whom the list missed). Duplicate
+  records of one person are merged (PhysicsWallah has two "Alakh Pandey" records). Equal scores count against us.
 
 ---
 Team docs: [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) (work split, deliverables, judging) · [docs/PLAN.md](docs/PLAN.md) (technical spec)

@@ -138,3 +138,13 @@ def test_weakest_link_and_hop_decay():
     assert path_score([strong, weak]) < path_score([weak]) * 1.5   # a weak link drags the whole chain down
     assert path_score([strong, strong]) == round(90 * 0.85, 1)
     assert path_score([]) == 0.0
+
+
+def test_title_changes_at_one_company_are_one_tenure():
+    """Live Razorpay data: both co-founders have several stints there; the overlap must run to today."""
+    t = P(1, "Target T", S(10, "Razorpay", (2014, 12, 1), (2022, 7, 1), ref="t0"), S(10, "Razorpay", (2022, 7, 1), ref="t1"))
+    a = P(2, "Alice A", S(10, "Razorpay", (2014, 12, 1), (2020, 1, 1), ref="a0"), S(10, "Razorpay", (2020, 1, 15), ref="a1"))
+    ov = find_overlaps(a, t)
+    assert len(ov) == 1 and ov[0].start == date(2014, 12, 1) and ov[0].end >= date.today()
+    assert (ov[0].a_stint_ref, ov[0].b_stint_ref) == ("a1", "t1")
+    assert "recent" in next(f for f in score_tie(a, t).factors if f.name == "recency").explanation

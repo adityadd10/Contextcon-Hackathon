@@ -108,3 +108,18 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
 - 12:15 · B · first full offline run (fake world, LLM off): "teh data guy at swigy pls, via iitb ppl" → Priya Sharma
   via a 2-hop path, draft fact check 10/10 sentences, 9 sources listed. Fixed: an ongoing overlap was cited as
   "ended <this month>"; blurb wording.
+- 12:50 · B · live eval, first run: 40% hit@1. Cause: `people.founders` is noisy. At Razorpay 12 of 14 entries are
+  "Founder's Office" staff and EAs; at Zomato most are one-job profiles claiming "Founder" with no dates (Deepinder
+  Goyal isn't listed). → a co-founder = founder title at that company, starting within 2 years of its founding.
+  This also stopped us paying 1 credit to enrich each fake founder. → 75% hit@1, still below "longest overlap" (86%).
+- 12:55 · B · read every miss factor by factor: 4 of 7 were real co-founders the list missed (Hemesh Singh,
+  Abhiraj Singh Bhal, Thiyagarajan T) or two Crustdata records for one person (Alakh Pandey). → apply the same
+  founder rule to the whole candidate pool, and merge same-name records. → 91% hit@1 / 94% hit@3 (random 9% / 25%,
+  longest overlap 88% / 94%, no-title ablation 91%). Remaining misses are real: Nikhil Kamath → Richard Pattle (True
+  Beacon co-founder), plus two Licious founder-titled profiles with no dated overlap.
+- 12:45 · B · bug found on live data: founders with several stints at one company (title changes) showed
+  "overlapped 91 months, 2014-12 → 2022-07" though both are still there, so recency said "ended 4 years ago".
+  → `find_overlaps` joins touching windows at the same company into one tenure.
+- 12:55 · B · known weakness (next step): company size uses the *latest* headcount, so founders who worked
+  together at a 10-person Razorpay get a big-company discount today. `/company/enrich` has a headcount time series;
+  using the headcount during the overlap is the fix. Not done now, because it adds a call per company per tie.

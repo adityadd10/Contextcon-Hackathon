@@ -82,13 +82,29 @@ def find_overlaps(a: Person, b: Person, min_months: float = 2) -> list[Overlap]:
             if m >= min_months:
                 out.append(Overlap(company_name=x.company_name, company_id=x.company_id, start=s, end=e,
                                    months=round(m, 1), a_stint_ref=x.ref, b_stint_ref=y.ref))
-    # one overlap per company (keep the longest)
-    best: dict[str, Overlap] = {}
+    # one overlap per company: title changes split a tenure into several stints, so join windows that touch
+    by_co: dict[str, list[Overlap]] = {}
     for o in out:
-        k = str(o.company_id or _norm_company(o.company_name))
-        if k not in best or o.months > best[k].months:
-            best[k] = o
-    return sorted(best.values(), key=lambda o: -o.months)
+        by_co.setdefault(str(o.company_id or _norm_company(o.company_name)), []).append(o)
+    merged = []
+    for group in by_co.values():
+        group.sort(key=lambda o: o.start)
+        runs: list[list[Overlap]] = []
+        for o in group:
+            if runs and (o.start - max(x.end for x in runs[-1])).days <= 45:
+                runs[-1].append(o)
+            else:
+                runs.append([o])
+        best = None
+        for run in runs:
+            s, e = run[0].start, max(x.end for x in run)
+            latest = max(run, key=lambda x: x.end)          # cite the most recent stints
+            o = Overlap(latest.company_name, latest.company_id, s, e, round(_months(s, e), 1),
+                        latest.a_stint_ref, latest.b_stint_ref)
+            if best is None or o.months > best.months:
+                best = o
+        merged.append(best)
+    return sorted(merged, key=lambda o: -o.months)
 
 
 def _stint(p: Person, ref: str) -> Stint | None:

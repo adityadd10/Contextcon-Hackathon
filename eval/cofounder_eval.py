@@ -27,6 +27,9 @@ from math import comb
 from pathlib import Path
 from typing import Callable
 
+from rapidfuzz import fuzz
+
+from warmpath.crust import parse_date
 from warmpath.models import Person, School, Stint, to_dict
 from warmpath.paths import same_person
 from warmpath.score import find_overlaps, score_tie
@@ -87,21 +90,46 @@ class FounderResult:
     top_pick_why: str
 
 
-def evaluate_company(company: str, founders: list[Person], colleagues: list[Person]) -> list[FounderResult]:
-    others_all = [p for p in colleagues if not any(same_person(p, f) for f in founders)]
-    out = []
+def founded_here(p: Person, company_id: int | None, year_founded: int | None) -> bool:
+    """Same founder test as is_founder(), on a parsed Person (used for people found by /person/search)."""
+    return any(s.company_id == company_id and s.title and _founder_title(s.title) and s.start
+               and (year_founded is None or abs(s.start.year - year_founded) <= 2) for s in p.stints)
+
+
+def evaluate_company(company: str, founders: list[Person], colleagues: list[Person],
+                     company_id: int | None = None, year_founded: int | None = None) -> list[FounderResult]:
+    """Rank every founder's co-founders against the colleague pool.
+
+    The ground truth is applied evenly: a colleague who passes the same founder test (Crustdata's founders
+    list misses some, e.g. Unacademy's Hemesh Singh) counts as a co-founder. Two records with the same name
+    are one person (PhysicsWallah has two "Alakh Pandey" records), never a co-founder pair.
+    """
+    pool = [p for p in colleagues if not any(same_person(p, f) for f in founders)]
+    if company_id is not None:
+        founders = founders + [p for p in pool if founded_here(p, company_id, year_founded)]
+        pool = [p for p in pool if not any(p is f for f in founders)]
+    uniq: list[Person] = []
     for f in founders:
-        cofounders = [x for x in founders if x is not f]
+        if not any(_same_name(f, u) for u in uniq):
+            uniq.append(f)
+    pool = [p for p in pool if not any(_same_name(p, u) for u in uniq)]
+    out = []
+    for f in uniq:
+        cofounders = [x for x in uniq if x is not f]
         if not cofounders:
             continue
-        candidates = cofounders + others_all
-        ranks = {m: cofounder_rank(f, cofounders, others_all, s) for m, s in METHODS.items()}
+        candidates = cofounders + pool
+        ranks = {m: cofounder_rank(f, cofounders, pool, s) for m, s in METHODS.items()}
         ties = sorted((score_tie(c, f) for c in candidates), key=lambda t: -t.score)
         top = ties[0]
         why = max(top.factors, key=lambda x: x.contribution).explanation if top.factors else "no signal"
         out.append(FounderResult(company, f.name, [c.name for c in cofounders], len(candidates), ranks,
                                  max(score_tie(c, f).score for c in cofounders), top.a.name, why))
     return out
+
+
+def _same_name(a: Person, b: Person) -> bool:
+    return re.sub(r"\W+", " ", a.name.lower()).strip() == re.sub(r"\W+", " ", b.name.lower()).strip()
 
 
 def summarise(results: list[FounderResult]) -> dict:
@@ -133,6 +161,38 @@ def _find(obj, key: str):
     return None
 
 
+FOUNDER_RE = re.compile(r"\bco-?\s?founder\b|\bfounder\b", re.I)
+NOT_FOUNDER = re.compile(r"founder[’']?s?\s+office|assistant|\bto the\b|chief of staff|\bEA\b", re.I)
+
+
+def _founder_title(t: str) -> bool:
+    return bool(FOUNDER_RE.search(t)) and not NOT_FOUNDER.search(t)
+
+
+def is_founder(d: dict, company_id: int | None = None, company_name: str = "",
+               year_founded: int | None = None) -> bool:
+    """A real co-founder: a founder title *at this company* that started within 2 years of its founding.
+
+    people.founders is noisy: "Founder's Office" staff and EAs (12 of 14 at Razorpay), and one-job profiles that
+    claim to have founded Zomato with no dates. Anything we can't check is left out, never guessed.
+    """
+    if company_id is None and not company_name:   # no company context: profile title only
+        bp = d.get("basic_profile") or {}
+        return _founder_title(bp.get("current_title") or bp.get("headline") or "")
+    emp = (d.get("experience") or {}).get("employment_details") or {}
+    for st in (emp.get("current") or []) + (emp.get("past") or []):
+        at_co = (company_id is not None and str(st.get("employer_company_id") or st.get("crustdata_company_id"))
+                 == str(company_id)) or (company_name and fuzz.token_set_ratio(
+                     (st.get("employer_name") or st.get("name") or "").lower(), company_name.lower()) >= 90)
+        t = st.get("employee_title") or st.get("title") or ""
+        if not at_co or not _founder_title(t):
+            continue
+        start = parse_date(st.get("employee_start_date") or st.get("start_date"))
+        if start and (year_founded is None or abs(start.year - year_founded) <= 2):
+            return True
+    return False
+
+
 def _profile_url(d: dict) -> str | None:
     for v in d.values() if isinstance(d, dict) else []:
         if isinstance(v, str) and "linkedin.com/in/" in v:
@@ -156,8 +216,12 @@ async def collect(c, company: str, log=print) -> dict | None:
     except CrustError as e:
         log(f"  {company}: company enrich failed ({e.message})")
         return None
-    raw_founders = _find(rows, "founders") or []
-    urls = list(dict.fromkeys(u for u in (_profile_url(x) for x in raw_founders if isinstance(x, dict)) if u))
+    year = _find(rows, "year_founded") or co.year_founded
+    year = int(str(year)[:4]) if year and str(year)[:4].isdigit() else None
+    listed = [x for x in _find(rows, "founders") or [] if isinstance(x, dict)]
+    raw_founders = [x for x in listed if is_founder(x, co.company_id, co.name, year)]
+    log(f"  {company}: {len(raw_founders)} of {len(listed)} listed founders verified (founded {year or '?'})")
+    urls = list(dict.fromkeys(u for u in (_profile_url(x) for x in raw_founders) if u))
     if len(urls) < 2:
         log(f"  {company}: {len(urls)} founder profile(s) listed, need 2+, skipped")
         return None
@@ -171,7 +235,7 @@ async def collect(c, company: str, log=print) -> dict | None:
     res = await c.person_search(f("experience.employment_details.company_id", "=", co.company_id), limit=POOL)
     colleagues = [to_person(p, "/person/search") for p in (res.get("profiles") or res.get("results") or [])]
     log(f"  {company}: {len(founders)} founders, {len(colleagues)} colleagues (id {co.company_id})")
-    return {"company": co.name, "company_id": co.company_id, "founders": to_dict(founders),
+    return {"company": co.name, "company_id": co.company_id, "year_founded": year, "founders": to_dict(founders),
             "colleagues": to_dict(colleagues)}
 
 
@@ -238,7 +302,8 @@ async def main_async(args) -> None:
     results: list[FounderResult] = []
     for d in datasets:
         results += evaluate_company(d["company"], [person_from_dict(p) for p in d["founders"]],
-                                    [person_from_dict(p) for p in d["colleagues"]])
+                                    [person_from_dict(p) for p in d["colleagues"]],
+                                    d.get("company_id"), d.get("year_founded"))
     s = summarise(results)
     md = report(results, s)
     print(md)
