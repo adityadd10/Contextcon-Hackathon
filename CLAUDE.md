@@ -8,6 +8,7 @@ Three people build in parallel. **The full spec, file ownership and contracts ar
 - Shared contracts: `warmpath/models.py` (dataclasses), the event schema in PLAN §6, the function signatures in PLAN §6.
   Add fields freely. Don't rename or remove without asking.
 - Only edit the files your member owns (PLAN §5). Small commits, `git pull --rebase` before pushing.
+- The social graph lives in `warmpath/graphdb.py` (`GraphStore`, SQLite at data/graph.db). Read/write it only through that class.
 - All Crustdata calls go through `warmpath/crust.py` (`Crust` client). Never call httpx directly, or you lose
   retries, pacing, caching, the credit budget and the audit trail.
 - Every claim shown to a user must carry `Evidence` (models.py). No uncited facts in the UI or in drafts.
