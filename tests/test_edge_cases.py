@@ -85,3 +85,11 @@ def test_bare_company_and_acronym_role_are_understood():
 def test_placeholder_employers_never_create_ties(name, generic):
     from warmpath.crust import is_generic_employer
     assert is_generic_employer(name) is generic
+
+
+def test_fake_mode_never_touches_the_real_graph(monkeypatch):
+    import importlib, warmpath.graphdb as gdb
+    monkeypatch.setenv("WARMPATH_FAKE", "1")
+    assert importlib.reload(gdb).DB_PATH.name == "graph.fake.db"
+    monkeypatch.setenv("WARMPATH_FAKE", "0")
+    assert importlib.reload(gdb).DB_PATH.name == "graph.db"

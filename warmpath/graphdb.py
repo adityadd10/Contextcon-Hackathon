@@ -14,6 +14,7 @@ Owner: Member A.
 from __future__ import annotations
 
 import json
+import os
 import math
 import re
 import sqlite3
@@ -26,7 +27,8 @@ from .crust import is_generic_employer, parse_date
 from .models import Company, Person, School, Stint, Tie, to_dict
 from .score import score_tie
 
-DB_PATH = Path("data/graph.db")
+# fake mode gets its own graph so offline demo data never mixes with real people (and vice versa)
+DB_PATH = Path("data/graph.fake.db" if os.getenv("WARMPATH_FAKE") == "1" else "data/graph.db")
 MIN_TIE = 25.0
 MAX_CANDIDATES = 600  # cap per company/school when deriving KNOWS edges
 

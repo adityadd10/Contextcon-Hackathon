@@ -6,6 +6,42 @@ Aditya's Claude Code appends an entry each improvement loop (about every 25 min 
 
 ---
 
+## 13:10 · Loop 7: fake/live isolation bug + demo story ready
+
+**Fixed (Aditya):** 🐞 **fake mode was replaying real Crustdata data.** The response cache is keyed by request body, so
+`WARMPATH_FAKE=1` returned *real* people and wrote them into the real graph DB. Fake mode now skips the cache and uses its
+own graph (`data/graph.fake.db`). Apurba: if the UI showed real names in fake mode, that was this, and it's fixed. 200 tests green.
+
+**🔒 Privacy rule (the repo is public):** never write third-party people's names or career details into tracked files
+(UPDATES, NOTES, README, tests, scenarios). Use roles ("a VC general partner", "connector A"). Our own three names are fine.
+Public founders used only as request text are OK. Demo specifics live in **`docs/DEMO.local.md`** (gitignored). Aditya will
+share it in the team chat.
+
+**🎬 Demo story (verified live):** a request to reach a **VC General Partner** for a seed round returns verified *"Your paths"*
+for **all three of us**: #1 Apurba → 1 connector → the GP (both hops at an **8–11 person startup**, + web co-mentions);
+#2 Aditya → Apurba → … (our real 69/100 tie); #3 Vaibhav (4 hops); then 5 strong outside connectors (80–90/100).
+Pitch line: *"three students with no VC network get a verified warm path to a General Partner in 30 seconds."* Fundraising
+intros are what brokers charge a share of the round for. Backups: the Swiggy head-of-data and Zepto CTO requests. All are cached.
+
+### Vaibhav (Member B): 🔴 #1 first, it's visible in the demo outbox
+1. **Multi-hop draft goes to the wrong person.** On a 4-hop seed path the draft is addressed to the *last* connector and says
+   *"We overlapped at <Vaibhav's old employer>"*, but the sender only overlapped with the *first* connector. The claim checker
+   passes it because each fact is true but attributed to the wrong pair. Fix: when the path starts at a seed, address the draft to
+   `nodes[1]` (the person the sender actually knows), cite `ties[0]` for "we worked together", and describe the rest of the chain.
+   Add a test: the recipient must be adjacent to the sender, and the checker must verify *who* overlapped with whom.
+2. Still open: the claim-checker `Pvt.` false positive (eval L06) · "data guy" → "head of data" (paraphrase 67%) · README `## Evaluation`.
+3. Check your tests for third-party names (privacy rule above).
+
+### Apurba (Member C)
+1. **Feature freeze for you now.** Rehearse the demo request from `docs/DEMO.local.md` in the UI: "Your paths" must show
+   the three team paths above the outside connectors. Open the #1 path's evidence (the small-startup headcount citation).
+2. Loom script (TEAM_GUIDE §6) around that request: request → steps → Your paths → click a hop → evidence + audit → draft →
+   Graph tab → scorecard (5–8 s). First take by 14:15. Don't show the multi-hop draft until Vaibhav's fix lands.
+   Before publishing the Loom, check that no stranger's personal details are shown in a way they wouldn't expect: blur
+   connector names in the video, or show only the team's own nodes clearly.
+
+---
+
 ## 12:52 · Loop 6: product eval harness + headcount history wired in
 
 **New: `eval/run_eval.py` + `eval/scenarios.py`** (Aditya). 28 gold scenarios (19 offline fake-world + 9 live) across the edge-case
@@ -135,7 +171,7 @@ Makr Microsystems, MediaGuru, Architect Sandeep Neena Associates …). Real team
 ### Apurba (Member C): do these
 1. Split the results into **"Your paths"** (`path.via_seed == true`) and **"Other people who can introduce you"**. The first
    section is the product's key value: an intro through someone *you* know.
-2. Multi-hop paths can be 4–5 nodes long (`Vaibhav → Poorvaj → Mayank → Tom → Srinivas`). Render each path as a
+2. Multi-hop paths can be 4–5 nodes long (`Vaibhav → A → B → C → target`). Render each path as a
    horizontal chain with the tie score and a ✓ on every hop, and wrap it on mobile.
 3. Graph tab demo data: `uv run warmpath graph stats` shows the live graph. `/api/graph/subgraph?center=person:379735373&depth=2`
    is Aditya's ego network. Team person IDs: Aditya `379735373`, Vaibhav `18800780`, Apurba `563317143`.

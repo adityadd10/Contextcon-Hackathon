@@ -130,8 +130,8 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
 - 13:10 · B · "teh data guy at swiggy pls" finds no target on origin/main because the parser fix wasn't pushed yet
   (no repo access for Vaibhav2402). Locally it runs end to end in the fake world: Priya Sharma, 2 verified paths, 2 drafts.
 - 12:20 · Aditya · team crawl (depth 1, 49 credits) gave 208 people / 1,135 relationships, which looked great but was wrong:
-  "Self-employed" etc. were treated as shared employers, building fake cliques (a real false path: Aditya → Ravi →
-  "Self-employed" → Dipyaman). Dropped generic employers at parse time → honest 135 people / 253 relationships.
+  "Self-employed" etc. were treated as shared employers, building fake cliques (a real false path: Aditya → [ex-colleague] →
+  "Self-employed" → [stranger]). Dropped generic employers at parse time → honest 135 people / 253 relationships.
 - 12:22 · Aditya · with seeds, stranger paths (65) outranked the personal 4-hop path (26) → seed-first ranking ("your paths").
 - 12:25 · Aditya · profiled a fully cached run: 2 s CPU, ~50 s waiting on free-LLM calls → drafts in parallel (34 s);
   the remaining fix (shorter LLM timeouts) is with Vaibhav.
@@ -194,3 +194,8 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
   poisoned entries on Vaibhav's machine. Anyone who ran WARMPATH_FAKE=1 with the cache on should check theirs before
   recording the demo (`grep -l '"crustdata_company_id": 1001' .cache/crust/*`). Fix belongs in crust.py: separate
   cache dir in fake mode. Also: run_eval.py writes the scorecard without encoding="utf-8" and crashes on Windows.
+- 13:05 · Aditya · bug: fake mode replayed real cached responses (cache key = request body) and polluted the real graph
+  → no cache + separate graph DB in fake mode. A first attempt (ignoring seeds in fake mode) broke a server test, so it was reverted.
+- 13:10 · Aditya · searched the live graph for the strongest team-reachable senior target → a VC general partner via Apurba's
+  small-startup colleague. While checking it, found that multi-hop drafts were addressed to the last connector instead of the
+  sender's own contact. Privacy: the repo is public, so third-party names now stay out of tracked files (demo specifics are kept locally).

@@ -56,6 +56,7 @@ class Crust:
         if transport is None and os.getenv("WARMPATH_FAKE") == "1":
             from .fake import FakeCrust  # offline demo world: no key, no credits
             transport, api_key, pace = FakeCrust(fail_first_with_429=False).transport(), "fake", False
+            use_cache = False  # the cache is keyed by request body: fake runs must never replay real responses
         self.api_key = api_key or os.getenv("CRUSTDATA_API_KEY", "")
         if not self.api_key:
             raise RuntimeError("CRUSTDATA_API_KEY missing: put it in .env (or WARMPATH_FAKE=1 for the offline demo world)")

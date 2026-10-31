@@ -11,3 +11,4 @@ data/
 .claude/
 eval/.fake_graph.db*
 eval/data/
+docs/*.local.md
