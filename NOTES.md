@@ -211,3 +211,6 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
 - 13:23 · Apurba · hit the 14:45 cache-poisoning bug on my machine: 13 of 44 `.cache/crust` files held the fake company 1001, from
   a WARMPATH_FAKE=1 server that ran in the repo before Loop 7. Quarantined .cache/, data/, reports/ and outbox/ (moved, not
   deleted). The video script now refuses to record live while the cache holds fake ids.
+- 13:40 · Aditya · the demo video and stage demo would show real strangers' names and careers. Added a display-only privacy mode
+  (WARMPATH_MASK_NAMES=1): connectors become initials and their URLs are hidden; the team and the target stay readable. The first version made
+  "A.M.." from a name with trailing junk, so initials are now taken from the first 3 clean words.

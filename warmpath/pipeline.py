@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import os
 import time
 import uuid
@@ -30,6 +31,9 @@ WEB_PROOF_TOP = int(os.getenv("WARMPATH_WEB_PROOF_TOP", "3"))
 async def run(request: str, emit: Emit | None = None, *, crust: Crust | None = None,
               graph: GraphStore | None = None, web_proof: bool = True) -> RunResult:
     emit = emit or ev.noop
+    masker = NameMasker(emit) if os.getenv("WARMPATH_MASK_NAMES") == "1" else None
+    if masker:
+        emit = masker
     t0 = time.time()
     run_id = time.strftime("%H%M%S-") + uuid.uuid4().hex[:4]
     own = crust is None
@@ -57,6 +61,8 @@ async def run(request: str, emit: Emit | None = None, *, crust: Crust | None = N
                     "Try adding the company name or a profile URL")
             result.warnings.append("target not resolved")
             return result
+        if masker:
+            masker.protect(target)
         ev.node(emit, "target", target)
         g.upsert_person(target)
         if company:
@@ -69,6 +75,9 @@ async def run(request: str, emit: Emit | None = None, *, crust: Crust | None = N
         # 3 discover
         ev.step(emit, "discover", "start", "Finding people who worked alongside the target")
         seeds = await load_seeds(c, spec, emit)
+        if masker:
+            for sd in seeds:
+                masker.protect(sd)
         for s in seeds:
             ev.node(emit, "seed", s)
         connectors = await find_connectors(c, target, spec, seeds, emit)
@@ -217,3 +226,55 @@ def _merge(a: list[IntroPath], b: list[IntroPath], spec: TargetSpec, seeds: list
     for i, p in enumerate(out, 1):
         p.rank = i
     return out
+
+
+class NameMasker:
+    """Privacy mode for demos and recordings (WARMPATH_MASK_NAMES=1): every person shown who is neither the requester's
+    own team (seeds) nor the requested target is reduced to initials, along with their profile URL, in everything emitted.
+    The underlying run, report and outbox are unchanged; only what is displayed is masked."""
+
+    def __init__(self, emit: Emit):
+        self.emit, self.protected, self.names = emit, set(), {}
+
+    def protect(self, p: Person) -> None:
+        self.protected.add(p.person_id)
+
+    def _learn(self, obj) -> None:
+        if isinstance(obj, dict):
+            pid, name = obj.get("person_id"), obj.get("name")
+            if pid is not None and isinstance(name, str) and name.strip() and "stints" in obj \
+                    and pid not in self.protected:
+                words = [w for w in re.split(r"[\s,]+", name) if w[:1].isalpha()][:3]
+                self.names[name] = "".join(w[0].upper() + "." for w in words) or "?"
+            for v in obj.values():
+                self._learn(v)
+        elif isinstance(obj, list):
+            for v in obj:
+                self._learn(v)
+
+    def __call__(self, e: dict):
+        self._learn(e)
+        if not self.names:
+            return self.emit(e)
+        text = json.dumps(e, default=str)
+        for name in sorted(self.names, key=len, reverse=True):
+            text = text.replace(json.dumps(name)[1:-1], self.names[name])
+            # also each first name on its own ("Hi Rahul,")
+            first = name.split()[0]
+            if len(first) > 2:
+                text = re.sub(rf"\b{re.escape(first)}\b", self.names[name], text)
+        out = json.loads(text)
+        for obj in _walk(out):
+            if isinstance(obj, dict) and obj.get("person_id") not in self.protected and "stints" in obj:
+                obj["profile_url"] = None
+        return self.emit(out)
+
+
+def _walk(obj):
+    yield obj
+    if isinstance(obj, dict):
+        for v in obj.values():
+            yield from _walk(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from _walk(v)

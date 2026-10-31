@@ -93,3 +93,13 @@ def test_fake_mode_never_touches_the_real_graph(monkeypatch):
     assert importlib.reload(gdb).DB_PATH.name == "graph.fake.db"
     monkeypatch.setenv("WARMPATH_FAKE", "0")
     assert importlib.reload(gdb).DB_PATH.name == "graph.db"
+
+
+def test_privacy_mode_masks_strangers_but_keeps_target(monkeypatch):
+    import json as _j
+    monkeypatch.setenv("WARMPATH_MASK_NAMES", "1")
+    r, ev = asyncio.run(_run("warm intro to the head of data at Swiggy via IIT Bombay alumni", GraphStore("g.db")))
+    shown = _j.dumps([e for e in ev if e["type"] in ("node", "path", "draft", "done", "edge")])
+    assert r.paths and "Rahul Verma" not in shown and "Rahul" not in shown   # connector masked everywhere
+    assert "Priya Sharma" in shown                                           # the requested target stays readable
+    assert r.paths[0].nodes[0].name == "Rahul Verma"                         # the real run is untouched

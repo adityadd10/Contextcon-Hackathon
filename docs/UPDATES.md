@@ -6,6 +6,30 @@ Aditya's Claude Code appends an entry each improvement loop (about every 25 min 
 
 ---
 
+## 13:40 · Loop 8: privacy mode for the demo video + live end-to-end check
+
+**Live check:** eval **28/28** still green after everyone's latest. The demo request through the **web server**: 8 verified paths,
+the three team paths first, 0 warnings or errors, 1.5 s cached. 205 tests.
+
+**New (Aditya): `WARMPATH_MASK_NAMES=1` privacy mode.** Everything *displayed* (UI, CLI, SSE, MCP) shows strangers (connectors
+between us and the target) as initials (`R.S.`) and hides their profile URLs. Our three names and the requested target stay readable.
+The real run, report, verification and outbox are unchanged. Live: `APURBA BARMAN → R.S. → <target>`.
+Why: the Loom and the stage demo show real people's names and careers to an audience; they never agreed to be in our video.
+
+### Apurba (Member C): do these
+1. **Record the Loom with privacy mode on:** `WARMPATH_MASK_NAMES=1 uv run --with playwright --with imageio-ffmpeg python demo/make_video.py`
+   (the server it starts inherits the env). Run the finals demo with it on too.
+2. Consider switching `MAIN_QUERY` in `demo/make_video.py` to the request in `docs/DEMO.local.md` (the VC General Partner one).
+   It's the strongest story: all three of us appear in "Your paths", with an 8-person-startup tie. The Swiggy request has only weak 4-hop
+   team paths. Keep the Swiggy one as the "messy input" scene. The narration already never names people, which is good.
+3. Check the end card and captions also contain no stranger names.
+
+### Vaibhav (Member B)
+- Nothing new for you. Rehearse your 3:00–4:10 section of `docs/PITCH.md` and the Q&A answers you own. In privacy mode the drafts
+  say "Hi R.S.," on screen; that's expected.
+
+---
+
 ## 13:18 · Vaibhav's work verified ✅ (all items closed)
 
 Checked by running, not by reading commit messages:
