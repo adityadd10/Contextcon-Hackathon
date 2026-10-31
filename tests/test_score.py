@@ -44,3 +44,10 @@ def test_rule_parser():
     assert s.company == "Swiggy" and s.role and "data" in s.role and s.network.schools == ["IIT Bombay"]
     s = parse_rules("intro to https://www.linkedin.com/in/someone/ for hiring")
     assert s.profile_url and s.purpose == "hiring"
+
+
+def test_team_keyword():
+    from warmpath.discover import team_keyword
+    assert team_keyword("Director - Data Science") == "data"
+    assert team_keyword("Senior Android Engineer") == "engineering" or team_keyword("Senior Android Engineer") == "android"
+    assert team_keyword(None) is None

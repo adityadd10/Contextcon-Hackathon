@@ -33,3 +33,10 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
 - 11:58 · Aditya · OpenRouter: the default free model names were stale (llama-3.3/deepseek gone). Listed /models and tested 3:
   Nemotron 3 Ultra works (3.7 s, correct JSON), Gemma 4 31B upstream 429, Inkling 403 (blocked for API use). Free tier = 50 req/day
   per key → LLM use must be capped and cached; rules stay the backbone.
+- 12:00 · Aditya · first LIVE run. Live surprises: (a) "Swiggy" identifies to 5 companies, 3 at confidence 1.0, so the size
+  tie-break picks the real one; (b) nobody at Swiggy is titled "Head of Data", so the strict title search returned 0 → added
+  seniority-aware fallbacks; (c) education uses start_year/end_year, so classmates never fired → fixed; (d)
+  `current.crustdata_company_id` is not a filter field (400). The alias is `current.company_id`.
+- 12:05 · Aditya · big-company noise: 129–465 IITB people "at Swiggy", mostly other teams → narrowed with team keyword +
+  start_date ≤ target end → 12 people. Also the LLM leaked the target company into the network filter → guard in discover.
+- 12:08 · Aditya · graph memory on real data: run 1 = 28 credits/63 s, run 3 = 5 credits/17 s (51 connectors recalled).

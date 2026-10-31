@@ -121,3 +121,17 @@ def test_crawl_grows_graph():
     stats, g = asyncio.run(main())
     assert stats["people"] >= 3 and stats["relationships"] >= 2
     assert g.strongest_path(9, 1) == [9, 2, 1]       # seed → Rahul → Priya discovered by crawling alone
+
+
+def test_target_employer_is_not_a_network_filter():
+    r, events, _ = go("warm intro to whoever runs data at Swiggy via IITB")  # baseline
+    from warmpath.models import TargetSpec, NetworkSpec
+    from warmpath.discover import network_filter
+    fake = FakeCrust(fail_first_with_429=False)
+
+    async def main():
+        async with Crust(api_key="x", use_cache=False, transport=fake.transport(), pace=False) as c:
+            spec = TargetSpec(raw="", network=NetworkSpec(schools=["IIT Bombay"], companies=["Swiggy"]))
+            return await network_filter(c, spec, lambda e: None, exclude_ids={1001})
+    flt = asyncio.run(main())
+    assert "1001" not in str(flt) and "IIT Bombay" in str(flt)

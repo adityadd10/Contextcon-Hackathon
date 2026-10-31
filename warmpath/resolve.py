@@ -6,7 +6,7 @@ import re
 from rapidfuzz import fuzz
 
 from . import events as ev
-from .crust import Crust, CrustError, all_of, f, to_company, to_person
+from .crust import Crust, CrustError, all_of, any_of, f, to_company, to_person
 from .events import Emit
 from .models import Company, Person, TargetSpec
 
@@ -88,11 +88,26 @@ async def resolve_target(c: Crust, spec: TargetSpec, emit: Emit) -> tuple[Person
             cands = await _search(c, cond[0], emit)
     elif spec.role and company and company.company_id:
         words = [w for w in re.findall(r"[a-z]+", spec.role.lower()) if w not in STOP]
-        for title_cond in (f("experience.employment_details.current.title", "[.]", spec.role),
-                           f("experience.employment_details.current.title", "(.)", " ".join(words))):
+        seniority_words = {kw for kw, _ in SENIORITY}
+        topic = [w for w in words if w not in seniority_words] or words
+        # strict → loose → topic word only (then rank by seniority). Live data: Swiggy has nobody titled exactly
+        # "Head of Data", but 300+ current titles containing "data", among them the real data leaders.
+        topic_word = max(topic, key=len)
+        senior = any_of(*(f("experience.employment_details.current.title", "[.]", w)
+                          for w in ("head", "vp", "vice president", "director", "chief", "lead", "principal")))
+        attempts = [("exact title", f("experience.employment_details.current.title", "[.]", spec.role), 10),
+                    (f"'{topic_word}' + senior title", all_of(f("experience.employment_details.current.title", "[.]",
+                                                                 topic_word), senior), 25),
+                    ("all words", f("experience.employment_details.current.title", "(.)", " ".join(words)), 10),
+                    (f"'{max(topic, key=len)}' + seniority", f("experience.employment_details.current.title", "[.]",
+                                                            max(topic, key=len)), 25)]
+        for label, title_cond, lim in attempts:
             cands = await _search(c, all_of(f("experience.employment_details.current.company_id", "=",
-                                              company.company_id), title_cond), emit)
+                                              company.company_id), title_cond), emit, limit=lim)
             if cands:
+                if label != "exact title":
+                    ev.step(emit, "resolve", "progress", f"No exact '{spec.role}' title, matched by {label}",
+                            f"{len(cands)} candidates at {company.name}")
                 break
     if not cands:
         return None, company

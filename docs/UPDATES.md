@@ -6,6 +6,47 @@ Aditya's Claude Code appends an entry each improvement loop (about every 25 min 
 
 ---
 
+## 12:08 · Loop 2: LIVE on real Crustdata ✅
+
+**Live result:** `"warm intro to the head of data at Swiggy via IIT Bombay alumni"` → Swiggy (id 5702, out of 5 "Swiggy"
+lookalikes) → target **Director - Data Science** → 4 past employers searched → 72 connectors → 5 cited paths → 3 drafts.
+First run 63 s / 28 credits. A repeat run: **17 s / 5 credits** (51 connectors recalled from the graph, cache hits).
+The account has 15,228 credits and every endpoint we use is enabled. ⚠️ Real people's data: **never commit `reports/`,
+`data/` or `outbox/`** (gitignored). Keep the demo fixtures fake.
+
+**Fixed in Aditya's files from live data:**
+- Education comes as `start_year`/`end_year` (not dates). It's now mapped, so the classmates factor can fire. A bare year
+  no longer parses as 1970.
+- Role resolution: Swiggy has nobody titled exactly "Head of Data". The fallbacks are now exact title → topic word +
+  senior title (head/VP/director/chief/lead) → all words → topic word, then rank by seniority.
+- **Big employers (>1,000 people):** connector search now also requires the target's team keyword (e.g. "data") and
+  `start_date =<` the target's end date. Swiggy ∩ IITB went from 465 people to the 12 on the data team.
+- Guard: the target's own employer is dropped from the network filter (the LLM put Swiggy there live, which made every Swiggy employee "in network").
+- 22 tests green.
+
+**Contract additions (backwards compatible):** `discover.team_keyword(title)`, `discover.BIG_COMPANY`,
+`network_filter(..., exclude_ids=...)`.
+
+### Vaibhav (Member B): do these
+1. **Scoring on real data (priority):** at Swiggy (29k people) a 27-month overlap still earns the full 40 overlap points,
+   so ex-Swiggy colleagues crowd out the 330-person Helpshift tie. Make overlap points depend on size, e.g.
+   `overlap_pts = 40 * min(1, months/24) * size_factor` with size_factor 1.0 at ≤200, 0.8 at ≤1k, 0.55 at ≤10k, 0.4 above.
+   Then add a "same team" bonus (both titles share `discover.team_keyword`) so same-team colleagues at big companies still rank.
+2. `function_category` is usually `""` on live data, so "same_function" rarely fires. Fall back to `team_keyword()` equality.
+3. Still open from 11:45/11:58: the parse.py "head of data" and lowercase-company fixes, target company in `companies`,
+   llm.py model chain plus call cap.
+4. The LLM-polished draft passed `check_claims` live and reads well. Keep that path.
+
+### Apurba (Member C): do these
+1. The real pipeline emits these step details. Render them as sub-lines: `"No exact 'head of data' title, matched by
+   'data' + senior title"`, `"Searched Swiggy ∩ IIT Bombay ∩ 'data' team · 12 of 12 people returned"`, and the
+   `"N recalled from the graph for free"` detail on the discover step. That last one is our "graph memory" demo moment.
+2. Show the run footer: API calls · credits · seconds (from the `done` event: `audit`, `credits_used`, `elapsed_s`).
+   "Second run: 5 credits instead of 28" is a strong line for the video.
+3. Live runs take 15–60 s (rate limits), so the streaming step list matters: show a spinner on the active step.
+
+---
+
 ## 11:58 · OpenRouter verified (free LLM is live)
 
 **Findings:**

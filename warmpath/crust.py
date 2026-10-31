@@ -206,6 +206,8 @@ def parse_date(v: Any) -> date | None:
     if not v:
         return None
     if isinstance(v, (int, float)):
+        if 1900 <= v <= 2100:                     # education uses start_year / end_year
+            return date(int(v), 1, 1)
         return datetime.fromtimestamp(v).date()
     s = str(v)
     for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d", "%Y-%m", "%Y"):
@@ -251,7 +253,8 @@ def to_person(pd: dict, endpoint: str) -> Person:
     stints = [_stint(r, f"{tag}#experience.current[{i}]", True) for i, r in enumerate(emp.get("current") or [])]
     stints += [_stint(r, f"{tag}#experience.past[{i}]", False) for i, r in enumerate(emp.get("past") or [])]
     schools = [School(name=s.get("school") or "?", degree=s.get("degree"), field_of_study=s.get("field_of_study"),
-                      start=parse_date(s.get("start_date")), end=parse_date(s.get("end_date")),
+                      start=parse_date(s.get("start_date") or s.get("start_year")),
+                      end=parse_date(s.get("end_date") or s.get("end_year")),
                       ref=f"{tag}#education.schools[{i}]")
                for i, s in enumerate((pd.get("education") or {}).get("schools") or [])]
     loc = bp.get("location")

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 from datetime import date
 
 from . import events as ev
@@ -15,6 +16,17 @@ from .crust import Crust, CrustError, all_of, any_of, f, to_person
 from .events import Emit
 from .models import Person, Stint, TargetSpec
 from .resolve import resolve_company
+
+BIG_COMPANY = 1000
+TEAM_WORDS = ["data", "analytics", "machine learning", "ml", "ai", "product", "design", "growth", "marketing", "sales",
+              "finance", "engineering", "platform", "infrastructure", "security", "mobile", "android", "ios",
+              "backend", "frontend", "research", "operations", "hr", "people", "recruit", "legal", "strategy"]
+
+
+def team_keyword(title: str | None) -> str | None:
+    t = (title or "").lower()
+    return next((w for w in TEAM_WORDS if re.search(rf"\b{re.escape(w)}\b", t)), None)
+
 
 MAX_STINTS = int(os.getenv("WARMPATH_MAX_STINTS", "4"))
 PER_QUERY = int(os.getenv("WARMPATH_PER_QUERY", "25"))
@@ -75,11 +87,15 @@ def school_variants(name: str) -> list[str]:
     return out
 
 
-async def network_filter(c: Crust, spec: TargetSpec, emit: Emit) -> dict | None:
+async def network_filter(c: Crust, spec: TargetSpec, emit: Emit, exclude_ids: set[int] | None = None) -> dict | None:
     conds = [f("education.schools.school", "(.)", v) for s in spec.network.schools for v in school_variants(s)]
     if spec.network.companies:
         cos = await asyncio.gather(*(resolve_company(c, n, emit) for n in spec.network.companies))
         ids = [co.company_id for co in cos if co and co.company_id]
+        dropped = [co.name for co in cos if co and co.company_id in (exclude_ids or set())]
+        if dropped:  # "via Swiggy people" to reach someone at Swiggy would make everyone there "in network"
+            ev.warn(emit, f"Ignoring {', '.join(dropped)} as a network filter because it's the target's own employer")
+        ids = [i for i in ids if i not in (exclude_ids or set())]
         if ids:
             conds.append(f(CO, "in", ids))
     return any_of(*conds) if conds else None
@@ -87,11 +103,20 @@ async def network_filter(c: Crust, spec: TargetSpec, emit: Emit) -> dict | None:
 
 async def find_connectors(c: Crust, target: Person, spec: TargetSpec, seeds: list[Person], emit: Emit) -> list[Person]:
     stints = rank_stints(target)
-    net = await network_filter(c, spec, emit)
+    net = await network_filter(c, spec, emit, exclude_ids={s.company_id for s in target.stints if s.company_id})
     queries: list[tuple[str, dict]] = []
     for s in stints:
         label = f"{s.company_name}" + (f" ∩ {', '.join(spec.network.schools)}" if spec.network.schools else "")
-        queries.append((label, all_of(f(CO, "=", s.company_id), net) if net else f(CO, "=", s.company_id)))
+        conds = [f(CO, "=", s.company_id), net]
+        if (s.company_headcount or 0) > BIG_COMPANY:
+            # at a big employer "same company" means little: narrow to people who joined before the target left
+            # and who share the target's team keyword (e.g. "data"), the colleagues most likely to know them
+            if s.end:
+                conds.append(f("experience.employment_details.start_date", "=<", s.end.isoformat()))
+            if (kw := team_keyword(s.title)):
+                conds.append(f("experience.employment_details.title", "[.]", kw))
+                label += f" ∩ '{kw}' team"
+        queries.append((label, all_of(*conds)))
     # 2-hop: people who worked at one of the seeds' companies AND one of the target's companies
     seed_cos = sorted({st.company_id for sd in seeds for st in sd.stints if st.company_id})
     tgt_cos = [s.company_id for s in stints]
