@@ -44,3 +44,15 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
   enrich and ties are recomputed from full records; vanished overlaps are dropped. First test design failed because the
   big-company team narrowing had already excluded the "stale" connector (good behaviour), so the test was rebuilt on a
   small-company tie. Live: 5/5 verified, 1 call.
+- 11:53 · Apurba · fixtures: recorded `fixtures/mock_events.jsonl` from a real `WARMPATH_FAKE=1` pipeline run instead of
+  hand-writing it → the UI's offline replay can never drift from the real event schema. Re-record after event changes.
+- 11:53 · Apurba · server: `/api/run` + `/api/crawl` stream SSE via an asyncio.Queue fed by `emit`; the pipeline task is
+  cancelled when the browser disconnects, so a closed tab stops spending credits. Exceptions become `error` events
+  instead of a silently dead stream.
+- 11:53 · Apurba · edge evidence: `subgraph()` stores factor summaries but not citations, so clicking an edge calls
+  `/api/graph/tie`, which re-runs `score_tie` on the two stored records. Every factor shows its Evidence, and it goes
+  through GraphStore only.
+- 11:53 · Apurba · MCP: the `mcp` package resolved to 2.x, where `FastMCP` was renamed `MCPServer`
+  (`mcp.server.mcpserver`) → wrote mcp_server.py against 2.x. Tools: find_warm_paths, explain_tie, graph_path.
+- 11:53 · Apurba · found: "teh data guy at swiggy pls" resolves no target (parser misses the lowercase company), so this is
+  already on Vaibhav's list in UPDATES.md. It's the robustness shot in the video, so it needs fixing before recording.

@@ -3,45 +3,140 @@
 **Warm intros to anyone, with every link verified on Crustdata's identity graph.**
 Team: Aditya · Vaibhav · Apurba · ContextCon 03 · IIT Bombay · Theme: Infrastructure for agents (also Hiring, Revenue, Investing)
 
-> _Team: fill in the sections below before 3:00 PM. Judges start here. Structure follows the event deck's README guide._
+> Ask *"get me a warm intro to whoever runs data at Swiggy, ideally through IIT Bombay people"*. WarmPath resolves
+> the real person, finds who actually worked next to them, scores how well each pair knows each other with reasons,
+> and writes a ready-to-forward intro request. Every link cites the Crustdata records behind it.
 
 ## The service
 _Which service it takes on, who does that job today, and who pays for it._
 
-People pay for introductions every day: fundraising advisors and placement agents (a share of the round), executive
-search and recruiting firms, sales teams (warm-path tools plus SDR hours), alumni offices. The job is finding *who
-actually knows the target well enough to introduce you*, and then asking them. Today that's manual profile-scrolling and guessing.
+People pay for introductions every day:
+
+| Who pays today | What they pay for |
+|---|---|
+| Founders raising money | Fundraising advisors and placement agents, often a share of the round, for investor intros |
+| Companies hiring | Executive-search and recruiting firms, for referrals and sourcing |
+| Sales teams | Warm-path tools (e.g. Sales Navigator TeamLink) plus SDR hours spent hunting for a mutual contact |
+| Universities | Alumni offices that broker student ↔ alumni intros |
+
+The job is always the same: find *who actually knows the target well enough to introduce you*, then ask them.
+Today that means scrolling through profiles and guessing ("I think Rahul knows her"). A **tool** stops at a list of
+names. WarmPath is a **service**: it delivers the finished intro request, with the reasons, and a person only steps in
+to approve the send.
 
 ## What it does now
 _The parts of the job it handles end to end, and where it still needs a person._
 
-TODO (Aditya/Apurba): request → resolve target → connectors with overlap → explainable tie scores → ranked paths → cited intro
-drafts in `outbox/` → persistent social graph. A person is needed only to approve sending.
+One sentence in, finished work out, no manual steps:
+
+1. **Understands the request.** It reads free text, typos, URLs and vague roles ("the data guy at swigy") with an OpenRouter free model and falls back to rules when the LLM is down.
+2. **Resolves the target** on Crustdata's identity graph. The company goes through a fallback chain (name → cleaned name → guessed domains → web search → URL). The person is picked with a stated reason ("currently at Swiggy; title best matches *head of data*"), and WarmPath warns on same-name ambiguity, people who left the company, and stale profiles.
+3. **Finds connectors**: people who worked at the **same canonical `crustdata_company_id` with overlapping dates**, filtered by your network (school, past companies, the team's own profiles).
+4. **Scores every tie** from 0 to 100 with explainable factors: months of overlap, company size at the time, same function, recency, classmates, and web co-mentions. Each factor cites the Crustdata record it came from.
+5. **Ranks intro paths.** 1-hop paths (you know the target), 2-hop (you → ex-colleague → target), and multi-hop chains through the persistent graph, where the strongest chain wins, not the shortest.
+6. **Drafts the intro ask.** It writes a double-opt-in note to the connector plus a forwardable blurb, and checks every claim against the evidence. Drafts go to `outbox/`. **Nothing is ever sent.**
+7. **Learns.** Every person and relationship goes into a persistent social graph, so later queries are cheaper and better.
+8. **Audits.** Every API call is logged with its request, credits used and a sha256 of the response.
+
+**Where it still needs a person:** approving and sending the intro (by design, and required by the event rules),
+and judging cases where the data is thin (redacted profiles, no dates, or no overlap within the network).
+
+### Three ways to use it
+- **Web UI** (`warmpath serve`): live step stream with the reason behind each decision, a path graph (click any edge to see its evidence), path cards with clickable citations, a Drafts tab, an Audit drawer, and a **Social graph** tab. The Social graph tab shows the whole network, lets you click an edge for its evidence, finds the path between any two people, lists super-connectors, and has a "Crawl my network" button.
+- **CLI** (`warmpath "<request>"`): the same live output in the terminal.
+- **MCP server** (`warmpath mcp`): tools `find_warm_paths`, `explain_tie` and `graph_path`, so any agent (Claude Code or Desktop) can find warm paths. This is the "infrastructure for agents" angle.
 
 ## What it could do next
 _What we'd build with more time, and why now isn't the time._
 
-TODO (all)
+- **Account maps for sales:** take a CSV of 20 target accounts and return the best warm path into each. The pipeline already does one account at a time, so this mostly needs batching and credit planning, which takes more credits than a hackathon day has.
+- **Watchers:** use `/watch/person` on targets and connectors and alert when a new path appears or a connector changes jobs. This only pays off over weeks, so it can't be demoed in a day.
+- **Two-sided consent:** the connector approves forwarding in one click before anything reaches the target. That needs real messaging and accounts, and the rules (rightly) forbid contacting people today.
+- **Learned tie weights:** fit the factor weights on accepted vs. ignored intros. That needs outcome data we don't have yet. Today's weights are hand-set and explainable.
+- **Neo4j at scale:** the graph already exports Cypher (`warmpath graph export`). Embedded SQLite is right for a demo that judges can run with no server.
 
 ## How to run it, and how it's built
+
 ```bash
 git clone https://github.com/adityadd10/Contextcon-Hackathon.git && cd Contextcon-Hackathon
-uv sync && cp .env.example .env   # add CRUSTDATA_API_KEY (+ optional OPENROUTER_API_KEY)
-uv run warmpath "warm intro to the head of data at Swiggy via IIT Bombay alumni"
-uv run uvicorn warmpath.server:app    # web UI at http://localhost:8000
-uv run warmpath crawl --seeds <profile_url>,<profile_url> --depth 2
+uv sync && cp .env.example .env   # add CRUSTDATA_API_KEY (+ optional OPENROUTER_API_KEY, WARMPATH_SEEDS)
+
+uv run warmpath "warm intro to the head of data at Swiggy via IIT Bombay alumni"   # CLI
+uv run warmpath serve                                                              # web UI → http://localhost:8000
+uv run warmpath crawl --seeds <profile_url>,<profile_url> --depth 2               # grow the graph
 uv run warmpath graph stats | brokers | path <from_id> <to_id> | export
+uv run warmpath mcp                                                                # MCP server (stdio)
+claude mcp add warmpath -- uv run --directory "$PWD" python -m warmpath.mcp_server
 ```
-TODO (A): architecture diagram; agents, models, tools, data; **where we call Crustdata** (Company Identify, Person
-Search, Person Enrich, Company Enrich, Web Search) and why each.
+
+**No API key?** `WARMPATH_FAKE=1 uv run warmpath serve` runs everything against an offline fake Crustdata world
+(Swiggy, a 30-person startup, Flipkart, two people named "Priya Sharma", a redacted profile). In the UI, the
+*offline replay* toggle replays a recorded run from `fixtures/mock_events.jsonl`.
+
+### Architecture
+
+```
+request ─► parse.py ─► resolve.py ─► discover.py ─► score.py ─► paths.py ─► webproof.py ─► draft.py ─► outbox/
+           LLM+rules   company+person  connectors     tie 0-100   ranking     web proof     cited drafts
+                            │              │              │
+                            └──── crust.py (all Crustdata calls: retries, pacing, cache, budget, audit) ────┘
+                                                          │
+                                  graphdb.py (persistent social graph: SQLite + networkx) ◄─ crawl.py
+pipeline.run(request, emit) ─► events ─► server.py (FastAPI + SSE) ─► static/index.html
+                                     ├─► cli.py (rich)
+                                     └─► mcp_server.py (MCP tools)
+```
+
+- **Agents and models:** one deterministic pipeline (`warmpath/pipeline.py`) and one entry point shared by the UI, CLI
+  and MCP. The LLM (OpenRouter free models via `llm.py`) is used only for request parsing and drafts. Every LLM use has
+  a rule-based fallback, so the system works with no LLM at all.
+- **Data:** Crustdata only. The relationship signal is the canonical `crustdata_company_id` on every role, plus dates.
+- **Social graph:** `(:Person)-[:WORKED_AT]->(:Company)`, `(:Person)-[:STUDIED_AT]->(:School)` and derived
+  `(:Person)-[:KNOWS {weight, factors, evidence}]-(:Person)`. Ingesting a person scores them against everyone already
+  in the graph who shares a company or school, so the graph densifies on its own. The strongest path is Dijkstra on
+  `-ln(score/100)`. Super-connectors are ranked by betweenness centrality.
+- **Tools and stack:** Python 3.12, uv, httpx, FastAPI with Server-Sent Events, SQLite, networkx, rapidfuzz, rich, MCP
+  SDK. The UI is a single HTML file using vis-network from a CDN, with no build step.
+
+### Where we call Crustdata (all through `warmpath/crust.py`)
+
+| Endpoint | Where | Why |
+|---|---|---|
+| `/company/identify` (free) | `resolve.py` | Turns "Swigy Pvt Ltd" / a domain / a URL into the canonical `crustdata_company_id` |
+| `/person/search` | `resolve.py`, `discover.py`, `crawl.py` | Finds the decision-maker by title + company, then people at the target's companies (∩ school/network) whose dates overlap |
+| `/person/enrich` | `resolve.py`, `discover.py` | Full career + education for the target and the team's seed profiles; handles `matched`/`not_found`/`redacted` |
+| `/company/enrich` | `eval/` (in progress) | `people.founders`, used as ground truth for the co-founder recovery eval |
+| `/web/search/live` | `resolve.py`, `webproof.py` | Fallback for company resolution; co-mentions (papers, talks, co-founded companies) as extra tie evidence |
+
+The client handles 429s with `retry-after`, paces each endpoint under its rate limit, caches to disk (demo reruns are
+free and deterministic), enforces a credit budget (a partial result plus a warning, never a crash), and records every
+call in the audit trail.
 
 ## The approaches we tried
-_What worked, what didn't, and why we chose the one we built._ (Source: [NOTES.md](NOTES.md))
+_What worked, what didn't, and why we chose the one we built._ (Full log: [NOTES.md](NOTES.md))
 
-TODO (Vaibhav)
+- **Ideas we rejected:** a résumé-claim verifier (solid but common), "Runway Radar" for predicting portfolio cash-outs
+  (too high-stakes to validate in 5 hours), and an inbound-lead desk / fact guard / vendor-pick tool (too close to
+  existing tools). WarmPath only works on a canonical person-company graph with dates, so it plays to Crustdata's strength.
+- **Ties from search filters vs. client-side overlap:** search filters match *any* role at a company, not the same
+  period, so we compute date overlap client-side on canonical company IDs. ✓
+- **Neo4j vs. embedded graph:** Neo4j needs Docker and a running server that judges can't easily run. We chose an embedded SQLite property graph plus networkx, with a Cypher export. ✓
+- **Shortest vs. strongest path:** the shortest path often runs through a weak "both at a 30k-person company" tie, so we use Dijkstra on `-ln(score)` instead, which makes a chain of strong ties beat a short weak one. ✓
+- **What failed:** the school filter `"IIT Bombay"` missed profiles that say "Indian Institute of Technology Bombay", so we added alias expansion. Searching the raw company string "Swigy Pvt Ltd company" failed, but searching the cleaned name works. The budget guard over-estimated search cost and blocked valid searches, so we fixed the estimate.
+
+TODO (Vaibhav): parser / scoring / draft approaches from NOTES.md.
+
+### The hardest case
+Same-name people and huge companies, where "both at Google" means nothing. Two people named "Priya Sharma" are
+disambiguated by company + title match, with a warning when it's still ambiguous. Big-company ties are discounted by
+company size at the time (25 points at ≤50 people, down to 2 above 10k), and same-function overlap raises them.
 
 ## Testing
-TODO (Vaibhav): unit tests, co-founder recovery eval (top-1/top-3 vs baseline), messy-input suite.
+- `uv run --with pytest pytest -q tests`: unit + offline end-to-end tests against the fake Crustdata world. They cover
+  overlap and scoring, graph derivation, the crawler, budget exhaustion, 429 retries, typos and redacted profiles.
+- **Co-founder recovery eval** (`eval/cofounder_eval.py`): for real startups, take the founders from
+  `/company/enrich`, then check whether the real co-founder is WarmPath's #1 connector. TODO (Vaibhav): top-1 / top-3
+  accuracy vs. a random-colleague baseline.
 
 ---
 Team docs: [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) (work split, deliverables, judging) · [docs/PLAN.md](docs/PLAN.md) (technical spec)
