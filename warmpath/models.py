@@ -160,6 +160,8 @@ class Tie:
     factors: list[Factor] = field(default_factory=list)
     overlaps: list[Overlap] = field(default_factory=list)
     kind: Literal["colleague", "classmate", "web", "self"] = "colleague"
+    verified: bool = False                       # re-checked against full /person/enrich records (verify.py)
+    verification: str = ""                       # how it was verified, or why it was dropped
 
 
 @dataclass

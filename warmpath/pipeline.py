@@ -18,6 +18,7 @@ from .parse import parse_request
 from .paths import build_paths, path_score
 from .resolve import resolve_target
 from .score import score_tie
+from .verify import verify_paths
 from .webproof import web_cooccurrence
 
 REPORTS = Path("reports")
@@ -105,6 +106,13 @@ async def run(request: str, emit: Emit | None = None, *, crust: Crust | None = N
             for i, p in enumerate(paths, 1):
                 p.rank = i
             ev.step(emit, "webproof", "done", "Web evidence attached")
+        if paths:
+            ev.step(emit, "verify", "start", "Verifying every link against full Crustdata profiles")
+            paths = await verify_paths(c, paths, emit)
+            for p in paths:
+                for a, b in zip(p.nodes, p.nodes[1:]):
+                    g.upsert_person(a, derive_ties=False)
+                    g.upsert_person(b, derive_ties=False)
         result.paths = paths
         for p in paths:
             for t in p.ties:

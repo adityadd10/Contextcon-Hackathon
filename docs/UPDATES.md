@@ -6,6 +6,36 @@ Aditya's Claude Code appends an entry each improvement loop (about every 25 min 
 
 ---
 
+## 12:15 · Loop 3: independent verification pass (criterion "Facts and verification", 20 pts)
+
+**Changed:** new `warmpath/verify.py` (Aditya). After ranking, the pipeline re-fetches everyone on the top paths with
+**one** `/person/enrich` call (≤25 profiles), recomputes every tie from the full canonical records, and **drops any path whose
+overlap disappears** (stale or partial search data), with a warning. Every Crustdata `Evidence` now carries the
+`call_id` of the record it was checked against, so a judge can trace each claim to an entry in the audit trail.
+Live: 5/5 paths verified, 1 extra call, run total 5 credits. New pipeline step id: `verify`. 24 tests green.
+
+**Contract additions (additive, nothing removed):**
+- `Tie.verified: bool` and `Tie.verification: str`, e.g. `"re-checked against full Crustdata profiles (enrich c012): Swiggy 2023-02 → 2025-05"`
+- `Evidence.call_id` is now filled for Crustdata evidence (it was `None`).
+- New step events: `{"type":"step","id":"verify",...}`.
+
+### Apurba (Member C): do these
+1. On every path card or edge, show a **✓ Verified** badge when `tie.verified`, with `tie.verification` as its tooltip or subtitle.
+   This is the single most important visual for the verification criterion.
+2. Make each citation clickable to its audit entry: `evidence.call_id` → highlight that row in the Audit drawer
+   (endpoint, request, credits, sha256). Profile `url` opens in a new tab.
+3. Add `verify` to the step list (between score and draft).
+
+### Vaibhav (Member B): do these
+1. `verify.py` calls `score.score_tie()` again on the enriched profiles, so your scoring changes apply automatically.
+   Keep `score_tie` pure (no I/O). Any new Factor you add must carry Evidence with `kind="crustdata"` and the stint `ref`
+   so the verifier can stamp a `call_id` on it.
+2. `draft.py`: only build drafts from `tie.verified` ties, and put "(verified via Crustdata)" in the forwardable blurb's
+   footer.
+3. Still open: the scoring size-weighting (12:08 entry), the parse.py fixes, and the llm.py chain plus cap.
+
+---
+
 ## 12:08 · Loop 2: LIVE on real Crustdata ✅
 
 **Live result:** `"warm intro to the head of data at Swiggy via IIT Bombay alumni"` → Swiggy (id 5702, out of 5 "Swiggy"

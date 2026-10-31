@@ -40,3 +40,7 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
 - 12:05 · Aditya · big-company noise: 129–465 IITB people "at Swiggy", mostly other teams → narrowed with team keyword +
   start_date ≤ target end → 12 people. Also the LLM leaked the target company into the network filter → guard in discover.
 - 12:08 · Aditya · graph memory on real data: run 1 = 28 credits/63 s, run 3 = 5 credits/17 s (51 connectors recalled).
+- 12:15 · Aditya · verification pass: search profiles can be partial, so every top-path person is re-fetched with one batched
+  enrich and ties are recomputed from full records; vanished overlaps are dropped. First test design failed because the
+  big-company team narrowing had already excluded the "stale" connector (good behaviour), so the test was rebuilt on a
+  small-company tie. Live: 5/5 verified, 1 call.

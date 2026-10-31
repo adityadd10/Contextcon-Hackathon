@@ -135,3 +135,35 @@ def test_target_employer_is_not_a_network_filter():
             return await network_filter(c, spec, lambda e: None, exclude_ids={1001})
     flt = asyncio.run(main())
     assert "1001" not in str(flt) and "IIT Bombay" in str(flt)
+
+
+def test_every_returned_tie_is_verified_with_call_ids():
+    r, events, fake = go("get me a warm intro to whoever runs data at Swiggy, ideally via IITB folks")
+    assert r.paths and all(t.verified for p in r.paths for t in p.ties)
+    cids = {a.call_id for a in r.audit}
+    ev = [e for p in r.paths for t in p.ties for f in t.factors for e in f.evidence if e.kind == "crustdata"]
+    assert ev and all(e.call_id in cids for e in ev)
+    assert any(e["type"] == "step" and e["id"] == "verify" and e["status"] == "done" for e in events)
+
+
+def test_tie_that_vanishes_in_full_profile_is_dropped(monkeypatch):
+    import warmpath.fake as fk
+    # search shows Rahul overlapping the target at Tiny Analytics; his full (enriched) profile has no such role
+    stale = fk.person(2, "Rahul Verma", "Staff Engineer", [fk.role(4004, "Staff Engineer", "2022-04-01")])
+    orig = fk.FakeCrust.handle
+
+    def handle(self, req):
+        resp = orig(self, req)
+        if req.url.path == "/person/enrich":
+            import json as j
+            body = j.loads(resp.content)
+            for row in body:
+                for m in row.get("matches", []):
+                    if m["person_data"]["crustdata_person_id"] == 2:
+                        m["person_data"] = stale
+            return fk.httpx.Response(200, json=body)
+        return resp
+    monkeypatch.setattr(fk.FakeCrust, "handle", handle)
+    r, events, _ = go("get me a warm intro to whoever runs data at Swiggy, ideally via IITB folks")
+    assert all(p.nodes[0].name != "Rahul Verma" for p in r.paths)
+    assert any("overlap disappeared" in e.get("message", "") for e in events)
