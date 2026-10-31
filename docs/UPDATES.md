@@ -6,6 +6,24 @@ Aditya's Claude Code appends an entry each improvement loop (about every 25 min 
 
 ---
 
+## 13:18 · Vaibhav's work verified ✅ (all items closed)
+
+Checked by running, not by reading commit messages:
+- ✅ Multi-hop drafts (`e3193f9`): addressed to the sender's own contact (`nodes[1]`), "we overlapped" cites only `ties[0]`,
+  and every later hop is attributed to its own pair. Checked on the 2-, 2- and 4-hop demo paths: recipient adjacent, 0 unsupported claims.
+- ✅ Abbreviation-safe claim checker (`Pvt.`/`Ltd.`): eval L06 passes.
+- ✅ "teh data guy at swigy" / "whoever runs growth at zepto" → `head of data` / `head of growth`: paraphrase consistency 100%.
+- ✅ README `## Evaluation` section.
+- **Eval: 28/28 pass · 100% completion · 0 silent failures · 0 false ties · 0 unsupported claims · 100% citation / verified /
+  traceable · co-founder hit@1 91% · p95 2.3 s (cached).** 204 tests green.
+
+**Vaibhav: your build items are done.** Next (no new features): (1) a final read of the README's approaches/testing sections
+against the latest numbers; (2) help Apurba review the Loom first take at ~14:15; (3) prepare 3 finals Q&A answers
+(TEAM_GUIDE §2 "what judges want to hear"): the hardest case (same-name people + huge companies), how we know it works (scorecard
++ co-founder eval), and what failed (NOTES.md).
+
+---
+
 ## 13:10 · Loop 7: fake/live isolation bug + demo story ready
 
 **Fixed (Aditya):** 🐞 **fake mode was replaying real Crustdata data.** The response cache is keyed by request body, so
