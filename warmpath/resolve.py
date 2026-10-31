@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 
 from rapidfuzz import fuzz
 
@@ -69,33 +70,66 @@ async def resolve_company(c: Crust, query: str, emit: Emit) -> Company | None:
     return best
 
 
+ROLE_ACRONYMS = {"cto": "chief technology officer", "ceo": "chief executive officer", "cfo": "chief financial officer",
+                 "coo": "chief operating officer", "cpo": "chief product officer", "cmo": "chief marketing officer",
+                 "cio": "chief information officer", "chro": "chief human resources officer", "cdo": "chief data officer",
+                 "ciso": "chief information security officer", "vp": "vice president", "svp": "senior vice president",
+                 "md": "managing director", "gm": "general manager", "em": "engineering manager", "pm": "product manager"}
+
+
 async def resolve_target(c: Crust, spec: TargetSpec, emit: Emit) -> tuple[Person | None, Company | None]:
+    if not (spec.person_name or spec.role or spec.company or spec.profile_url or _bare_profile_url(spec.raw)):
+        bare = " ".join(re.sub(r"[^\w&.\- ]", " ", spec.raw or "").split())
+        if 0 < len(bare.split()) <= 4:  # "Swiggy", "Zepto Pvt Ltd": a bare company name
+            spec.company = bare
+            ev.step(emit, "resolve", "progress", f"Treating '{bare}' as a company", "no person or role was given")
     company = await resolve_company(c, spec.company, emit) if spec.company else None
     if company:
         ev.step(emit, "resolve", "progress", "Resolved company",
                 f"{company.name} (crustdata_company_id {company.company_id}, {company.employee_count_range or '?'} people)")
 
-    if spec.profile_url:
-        return await enrich_one(c, spec.profile_url, emit), company
+    url = spec.profile_url or _bare_profile_url(spec.raw)
+    if url:
+        return await enrich_one(c, normalize_profile_url(url), emit), company
+
+    if company and not spec.person_name and not spec.role:
+        # "intro to Swiggy": nobody named, so default to the company's leadership and say so
+        spec.role = "founder ceo"
+        ev.step(emit, "resolve", "progress", "No person or role given",
+                f"defaulting to {company.name}'s leadership (founder / CEO); name a role to change this")
 
     cands: list[dict] = []
     if spec.person_name:
-        cond = [f("basic_profile.name", "(.)", spec.person_name)]
-        if company and company.company_id:
-            cond.append(f("experience.employment_details.company_id", "=", company.company_id))
-        cands = await _search(c, all_of(*cond), emit)
-        if not cands and company:  # maybe they left the company: retry on name only
-            cands = await _search(c, cond[0], emit)
+        name_exact = f("basic_profile.name", "[.]", spec.person_name)   # (.) is fuzzy: "Kunal" also hits "Krunal"
+        at_co = f("experience.employment_details.company_id", "=", company.company_id) if company and company.company_id else None
+        cands = await _search(c, all_of(name_exact, at_co) if at_co else name_exact, emit)
+        if not cands and at_co:
+            cands = await _search(c, all_of(f("basic_profile.name", "(.)", spec.person_name), at_co), emit)
+        if not cands and company:  # not indexed under that company: find their profile on the web, then enrich
+            found = await _web_profile(c, spec.person_name, company.name, emit)
+            if found:
+                return found, company
+        if not cands:
+            cands = await _search(c, name_exact, emit)
     elif spec.role and company and company.company_id:
+        expanded = " ".join(ROLE_ACRONYMS.get(w, w) for w in spec.role.lower().split())
+        if expanded != spec.role.lower() and spec.role != "founder ceo":
+            ev.step(emit, "resolve", "progress", f"Reading '{spec.role}' as '{expanded}'")
+            spec.role = expanded
         words = [w for w in re.findall(r"[a-z]+", spec.role.lower()) if w not in STOP]
         seniority_words = {kw for kw, _ in SENIORITY}
         topic = [w for w in words if w not in seniority_words] or words
         # strict → loose → topic word only (then rank by seniority). Live data: Swiggy has nobody titled exactly
         # "Head of Data", but 300+ current titles containing "data", among them the real data leaders.
-        topic_word = max(topic, key=len)
+        topic_word = max(topic, key=len) if topic else spec.role
         senior = any_of(*(f("experience.employment_details.current.title", "[.]", w)
                           for w in ("head", "vp", "vice president", "director", "chief", "lead", "principal")))
-        attempts = [("exact title", f("experience.employment_details.current.title", "[.]", spec.role), 10),
+        if spec.role == "founder ceo":
+            attempts = [("leadership title", any_of(*(f("experience.employment_details.current.title", "[.]", w)
+                                                     for w in ("founder", "ceo", "chief executive", "managing director"))), 25)]
+        else:
+            attempts = []
+        attempts += [("exact title", f("experience.employment_details.current.title", "[.]", spec.role), 10),
                     (f"'{topic_word}' + senior title", all_of(f("experience.employment_details.current.title", "[.]",
                                                                  topic_word), senior), 25),
                     ("all words", f("experience.employment_details.current.title", "(.)", " ".join(words)), 10),
@@ -110,6 +144,10 @@ async def resolve_target(c: Crust, spec: TargetSpec, emit: Emit) -> tuple[Person
                             f"{len(cands)} candidates at {company.name}")
                 break
     if not cands:
+        who = spec.person_name and f"anyone named '{spec.person_name}'" or spec.role and f"a '{spec.role}'" or "the person"
+        where = f" at {company.name}" if company else ""
+        hint = "" if company or not spec.company else f" (and the company '{spec.company}' wasn't found)"
+        ev.warn(emit, f"Crustdata has no record of {who}{where}{hint}. Check the spelling, or paste a LinkedIn profile URL.")
         return None, company
 
     people = [to_person(p, "/person/search") for p in cands]
@@ -121,6 +159,11 @@ async def resolve_target(c: Crust, spec: TargetSpec, emit: Emit) -> tuple[Person
     elif company and any(st.company_id == company.company_id for st in best.stints):
         why.append(f"was at {company.name} (may have moved on)")
         ev.warn(emit, f"{best.name} is no longer at {company.name} according to Crustdata. The intro may be outdated.")
+    elif company:
+        why.append(f"no {company.name} role on record")
+        ev.warn(emit, f"No '{spec.person_name or spec.role}' with {company.name} in their history is in Crustdata. "
+                      f"Best match is {best.name} ({best.current_title or 'unknown role'}), who may be a different "
+                      f"person. Paste their LinkedIn URL to be sure.")
     if spec.role:
         why.append(f"title '{best.current_title}' best matches '{spec.role}'")
     ev.step(emit, "resolve", "progress", "Picked target",
@@ -135,6 +178,38 @@ async def resolve_target(c: Crust, spec: TargetSpec, emit: Emit) -> tuple[Person
         if full and full.stints:
             return full, company
     return best, company
+
+
+async def _web_profile(c: Crust, name: str, company: str, emit: Emit) -> Person | None:
+    """Crustdata Web Search for the person's profile page, then enrich it (2 credits). Only accepts a page whose
+    title carries the full name, and a profile that actually lists the company."""
+    try:
+        res = await c.web_search(f'"{name}" {company}', site="linkedin.com/in")
+    except CrustError:
+        return None
+    for r in (res.get("results") or [])[:5]:
+        url, title = r.get("url") or "", (r.get("title") or "").lower()
+        if "linkedin.com/in/" in url and all(part in title for part in name.lower().split()):
+            p = await enrich_one(c, normalize_profile_url(url), emit)
+            if p and any(fuzz.token_set_ratio(company.lower(), st.company_name.lower()) >= 85 for st in p.stints):
+                ev.step(emit, "resolve", "progress", f"Found {p.name} via web search",
+                        f"not indexed under {company}; profile located with /web/search/live, then enriched")
+                return p
+    return None
+
+
+BARE_PROFILE = re.compile(r"(?:https?://)?(?:[a-z]{2,3}\.)?linkedin\.com/in/([\w\-%]+)", re.I)
+
+
+def _bare_profile_url(text: str) -> str | None:
+    m = BARE_PROFILE.search(text or "")
+    return m.group(0) if m else None
+
+
+def normalize_profile_url(url: str) -> str:
+    """'linkedin.com/in/x', 'in.linkedin.com/in/x?trk=..' → 'https://www.linkedin.com/in/x/'"""
+    m = BARE_PROFILE.search(url)
+    return f"https://www.linkedin.com/in/{m.group(1)}/" if m else url.strip()
 
 
 async def enrich_one(c: Crust, url: str, emit: Emit) -> Person | None:
@@ -173,6 +248,13 @@ def _target_rank(p: Person, spec: TargetSpec, company: Company | None) -> float:
         score += 8 * max((pts for kw, pts in SENIORITY if kw in title), default=0)
     if company and any(s.is_current and s.company_id == company.company_id for s in p.stints):
         score += 40
+    # thin records (1 role, no school) are often mis-attributed: prefer well-documented profiles
+    score += 3 * min(len(p.stints), 6) + (4 if p.schools else 0)
+    if company and spec.role == "founder ceo":
+        here = [s for s in p.stints if s.company_id == company.company_id and s.start]
+        if here:  # leadership default: founders and long-tenured leaders of *this* company first
+            months = max(((s.end or date.today()) - s.start).days / 30.44 for s in here)
+            score += min(months, 120) / 3 + (25 if any("found" in (s.title or "").lower() for s in here) else 0)
     return score
 
 

@@ -142,3 +142,9 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
   (91% / 94%, with a latest-headcount ablation row). All 11 startups were already >1k people when their records start,
   so the gain here is a correct, dated size claim rather than a ranking change. Size text no longer says "worked
   closely" for a 5k-person company.
+- 12:40 · Aditya · adversarial sweep (35 inputs) found 2 serious bugs: no `done` on an unresolved target (UI would hang) and
+  sqlite "database is locked" (uncommitted upsert_tie). Both fixed; the sweep is now a permanent test.
+- 12:50 · Aditya · live edge cases: "CTO" ≠ "Chief Technology Officer" in data → acronym expansion; bare "Swiggy" picked a junk
+  1-role "CEO" → leadership default + thin-profile penalty → real co-founder; fuzzy name matching ("Kunal" ~ "Krunal") →
+  exact-phrase first + web-search-for-profile fallback. Tried: web fallback alone was ambiguous until we required the profile to
+  list the company.

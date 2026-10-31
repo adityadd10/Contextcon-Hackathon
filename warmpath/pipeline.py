@@ -49,6 +49,9 @@ async def run(request: str, emit: Emit | None = None, *, crust: Crust | None = N
         target, company = await resolve_target(c, spec, emit)
         result.target, result.target_company = target, company
         if not target:
+            if not (spec.person_name or spec.role or spec.company or spec.profile_url):
+                ev.warn(emit, "I couldn't tell who you want to reach. Try: \"warm intro to the head of data at "
+                              "Swiggy\", a person's name plus company, or a LinkedIn profile URL.")
             ev.step(emit, "resolve", "error", "Could not resolve the target",
                     "Try adding the company name or a profile URL")
             result.warnings.append("target not resolved")
@@ -136,16 +139,24 @@ async def run(request: str, emit: Emit | None = None, *, crust: Crust | None = N
     except CrustError as e:
         result.warnings.append(str(e))
         emit({"type": "error", "message": str(e)})
+    except Exception as e:  # unexpected tool response / bug: report it, never leave the UI hanging
+        msg = f"Unexpected {type(e).__name__}: {e}"
+        result.warnings.append(msg)
+        emit({"type": "error", "message": msg})
     finally:
         result.audit, result.credits_used = c.audit, round(c.credits_used, 2)
         result.elapsed_s = round(time.time() - t0, 1)
-        REPORTS.mkdir(exist_ok=True)
-        (REPORTS / f"{run_id}.json").write_text(json.dumps(to_dict(result), indent=1, default=str))
+        try:
+            REPORTS.mkdir(exist_ok=True)
+            (REPORTS / f"{run_id}.json").write_text(json.dumps(to_dict(result), indent=1, default=str))
+        except OSError as e:
+            result.warnings.append(f"could not write report: {e}")
         if own:
             await c.__aexit__()
         if graph is None:
             g.close()
-    emit({"type": "done", "result": to_dict(result)})
+        # exactly one `done` per run, on every exit path (early return, error, success)
+        emit({"type": "done", "result": to_dict(result)})
     return result
 
 

@@ -6,6 +6,46 @@ Aditya's Claude Code appends an entry each improvement loop (about every 25 min 
 
 ---
 
+## 12:58 · Loop 5: edge-case hardening, then live edge cases (no crashes, no hangs, no silent failures)
+
+Ran a 35-input adversarial sweep (empty, emoji, SQL/HTML/rich-markup injection, Hindi/Hinglish, 5,000-char, NUL bytes,
+typos, bare URLs, unknown companies, redacted profiles) offline, then 6 hard **live** requests. It is now a permanent test,
+`tests/test_edge_cases.py`: every input must end with exactly one `done`, no `error`, and a warning that explains any
+failure. **137 tests green.**
+
+**Bugs found and fixed (Aditya's files):**
+1. 🐞 **No `done` event when the target couldn't be resolved.** The early return skipped it, so **the UI would spin forever** on any bad
+   input (22/35 cases). `done` is now emitted in `finally`, exactly once, and unexpected exceptions become an `error` event + `done`.
+2. 🐞 **`sqlite3 OperationalError: database is locked`.** `upsert_tie` never committed, so a concurrent crawl + run deadlocked.
+   Fixed with commits, WAL mode and a busy timeout. There's a test with two concurrent writers.
+3. Silent failures: every unresolved target now gets a specific warning ("Crustdata has no record of a 'CTO' at Zepto…",
+   "I couldn't tell who you want to reach. Try: …").
+4. Live: **"CTO" found nobody** because titles say "Chief Technology Officer". Acronyms are expanded (CTO/CEO/CFO/COO/CPO/CMO/VP/MD/…). Zepto's
+   CTO now resolves.
+5. Live: **bare company "Swiggy"** (no role) gave nothing. It's now treated as a company → defaults to its leadership; it found
+   Swiggy's co-founder. It previously picked a junk 1-role "CEO" record, so thin profiles are now penalised in target ranking.
+6. Live: **"Kunal Shah at CRED"**: the name search was fuzzy ("Kunal" matched "Krunal"/"Kuntal"). It now uses exact-phrase name matching
+   first. If the person isn't indexed under the company, it uses Crustdata Web Search `site:linkedin.com/in` → enrich (must list the
+   company). The warning now distinguishes "left the company" from "never had a role there (possibly a different person)".
+7. `linkedin.com/in/x` without `https://` (and `in.linkedin.com/...?trk=`) is normalised.
+
+### Apurba (Member C): do these
+1. **Security:** the sweep includes `<script>alert(1)</script>` and `[bold]` as names. Make sure `index.html` inserts *all*
+   Crustdata/user text with `textContent` (never `innerHTML`), including warnings, tooltips and graph labels. The CLI already escapes.
+2. The UI must treat `done` as the only end signal (it now always arrives), and show the `error` event text if one arrives
+   before it. Test with the request `""` and `"intro to the CEO at Nonexistent Corp"`.
+3. Add 2 demo chips that show robustness live: `"Swiggy"` (→ co-founder) and `"warm intro to the CTO at zepto via iit bombay"`.
+
+### Vaibhav (Member B): do these
+1. `parse.py`: Hindi `"मुझे Swiggy के head of data से मिलवाओ"` only works with the LLM on. Add a rule: a known company token + a role
+   phrase anywhere in the text, regardless of grammar. Add it to your messy-request suite.
+2. `parse.py`: a bare `"Swiggy"` gives an empty spec (resolve now rescues it, but the parse step shows `company=None`). Set
+   `company` when the whole request is 1–4 words.
+3. `score.py`: thin-profile candidates (1 role, no education) can also appear as *connectors*. Consider a small confidence discount
+   so a 1-role record never becomes the #1 path on its own.
+
+---
+
 ## 12:32 · Integration check: everyone's work merged ✅
 
 `main` now has all three members' work and **105 tests pass** together. Thanks, both of you, great pace.

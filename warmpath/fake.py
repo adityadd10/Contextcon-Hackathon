@@ -134,7 +134,7 @@ class FakeCrust:
         if path == "/person/enrich":
             out = []
             for url in body["professional_network_profile_urls"]:
-                if url == REDACTED:
+                if url.rstrip("/").lower() == REDACTED.lower():
                     out.append({"matched_on": url, "match_status": "redacted", "matches": []})
                     continue
                 p = next((p for p in PEOPLE if p["social_handles"]["professional_network_identifier"]["profile_url"]

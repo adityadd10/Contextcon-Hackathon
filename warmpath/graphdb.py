@@ -77,12 +77,18 @@ class GraphStore:
     def __init__(self, path: Path | str = DB_PATH):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(self.path)
+        # WAL + busy timeout: the server may run a crawl and a request at the same time
+        self.db = sqlite3.connect(self.path, timeout=30, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
+        self.db.execute("PRAGMA journal_mode=WAL")
+        self.db.execute("PRAGMA busy_timeout=30000")
         self.db.executescript(SCHEMA)
 
     def close(self) -> None:
-        self.db.close()
+        try:
+            self.db.commit()
+        finally:
+            self.db.close()
 
     # ------------------------------------------------------------ writes
 
@@ -144,6 +150,7 @@ class GraphStore:
                                  "factors": [{"name": f.name, "contribution": f.contribution,
                                               "explanation": f.explanation} for f in t.factors]},
                           evidence=[to_dict(e) for f in t.factors for e in f.evidence])
+        self.db.commit()
 
     def _derive_ties(self, p: Person) -> int:
         me = person_node(p.person_id)
