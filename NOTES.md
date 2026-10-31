@@ -168,3 +168,16 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
   LangSmith would ship real people's career data to a SaaS, and judges couldn't rerun it. Local gold scenarios + scorecard +
   history instead. Its first live run caught 2 bugs the offline world missed ("swigy" → lookalike "swigym"; claim checker false
   positive on "Pvt.") and one product flaw (paraphrase consistency 67%).
+- 14:20 · B · edge-case loops on Vaibhav's modules (probe → fix → regression test → re-probe):
+  loop 1 (hostile inputs): 4 crashes (one-node path draft, null web results, null titles, non-string LLM reply) and
+  12 wrong answers (20k-char input became a company, "at" read as a company/name, José Álvarez / 李明 not read as
+  names, "Dr." kept, URL paths kept, "vp of sales of freshworks" → company "sales of freshworks", unnamed schools =
+  classmates +15, 0 headcount = "tiny team", same object scored as a tie, nested JSON lost). All fixed.
+  loop 2 (16 nasty requests through the whole offline pipeline): 0 invariant violations (done event, evidence on every
+  factor, verified drafts fact-checked, unverified drafts flagged).
+  loop 3 (hostile LLM): empty / subject-only / fenced / non-string replies could replace the template with an empty
+  email → rejected now; prompt injection and oversized replies were already rejected; the parser ignored wrong types.
+  loop 4 (4,321 real ties from the eval data): 49 ties scored differently by argument order (BrowserStack founders
+  91.3 vs 93.7). Cause: "Lime Labs LLC" matched "Lime Spot Technology India" as a word subset, and overlaps were
+  grouped by one side's spelling. → whole-name matching after stripping generic words, order-free grouping. Removed
+  ~24 false "worked together again" bonuses. Eval unchanged (91% / 94%). 191 tests.

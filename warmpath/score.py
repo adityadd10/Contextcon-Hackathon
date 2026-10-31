@@ -48,7 +48,8 @@ def _months(a: date, b: date) -> float:
 
 def _norm_company(name: str) -> str:
     s = re.sub(r"\(.*?\)", "", name.lower())
-    s = re.sub(r"\b(inc|llc|ltd|pvt|private|limited|corp|corporation|technologies|technology|labs|co)\b\.?", "", s)
+    s = re.sub(r"\b(inc|llc|ltd|pvt|private|limited|corp|corporation|technologies|technology|labs|co|software|"
+               r"solutions|services|systems|india|global|international|group|holdings|ventures|company)\b\.?", "", s)
     return re.sub(r"[^a-z0-9]+", " ", s).strip()
 
 
@@ -56,7 +57,8 @@ def same_company(x: Stint, y: Stint) -> bool:
     if x.company_id and y.company_id:
         return x.company_id == y.company_id
     a, b = _norm_company(x.company_name), _norm_company(y.company_name)
-    return bool(a and b) and fuzz.token_set_ratio(a, b) >= 92
+    # whole-name similarity, not word subsets: "lime" (Lime Labs) must not match "lime spot india"
+    return bool(a and b) and fuzz.token_sort_ratio(a, b) >= 92
 
 
 def stint_end(s: Stint) -> tuple[date | None, bool]:
@@ -71,7 +73,7 @@ def stint_end(s: Stint) -> tuple[date | None, bool]:
 
 
 def find_overlaps(a: Person, b: Person, min_months: float = 2) -> list[Overlap]:
-    out: list[Overlap] = []
+    out: list[tuple[str, Overlap]] = []
     for x in a.stints:
         for y in b.stints:
             if not (x.start and y.start) or not same_company(x, y):
@@ -82,15 +84,20 @@ def find_overlaps(a: Person, b: Person, min_months: float = 2) -> list[Overlap]:
             s, e = max(x.start, y.start), min(xe, ye)
             m = _months(s, e)
             if m >= min_months:
-                out.append(Overlap(company_name=x.company_name, company_id=x.company_id, start=s, end=e,
-                                   months=round(m, 1), a_stint_ref=x.ref, b_stint_ref=y.ref))
+                # name and grouping key must not depend on argument order: score_tie(a, b) == score_tie(b, a)
+                name = min(x.company_name, y.company_name) if not (x.company_id or y.company_id) else (
+                    x.company_name if x.company_id else y.company_name)
+                key = str(x.company_id or y.company_id or min(_norm_company(x.company_name),
+                                                             _norm_company(y.company_name)))
+                out.append((key, Overlap(company_name=name, company_id=x.company_id or y.company_id, start=s,
+                                         end=e, months=round(m, 1), a_stint_ref=x.ref, b_stint_ref=y.ref)))
     # one overlap per company: title changes split a tenure into several stints, so join windows that touch
     by_co: dict[str, list[Overlap]] = {}
-    for o in out:
-        by_co.setdefault(str(o.company_id or _norm_company(o.company_name)), []).append(o)
+    for key, o in out:
+        by_co.setdefault(key, []).append(o)
     merged = []
     for group in by_co.values():
-        group.sort(key=lambda o: o.start)
+        group.sort(key=lambda o: (o.start, o.end, min(o.a_stint_ref, o.b_stint_ref)))
         runs: list[list[Overlap]] = []
         for o in group:
             if runs and (o.start - max(x.end for x in runs[-1])).days <= 45:
@@ -100,13 +107,13 @@ def find_overlaps(a: Person, b: Person, min_months: float = 2) -> list[Overlap]:
         best = None
         for run in runs:
             s, e = run[0].start, max(x.end for x in run)
-            latest = max(run, key=lambda x: x.end)          # cite the most recent stints
+            latest = max(run, key=lambda x: (x.end, x.start))   # cite the most recent stints
             o = Overlap(latest.company_name, latest.company_id, s, e, round(_months(s, e), 1),
                         latest.a_stint_ref, latest.b_stint_ref)
             if best is None or o.months > best.months:
                 best = o
         merged.append(best)
-    return sorted(merged, key=lambda o: -o.months)
+    return sorted(merged, key=lambda o: (-o.months, o.company_name))
 
 
 def _stint(p: Person, ref: str) -> Stint | None:

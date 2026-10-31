@@ -132,3 +132,16 @@ def test_hostile_llm_parse_never_overrides_rules(monkeypatch, data):
     s = asyncio.run(parse_request("teh data guy at swiggy pls via iitb"))
     assert s.company == "swiggy" and s.person_name is None and 1 <= s.max_paths <= 10
     assert all(isinstance(x, str) and x for x in s.network.schools)
+
+
+def test_tie_score_is_symmetric_and_lookalike_names_dont_match():
+    """Loop 4 on 4,321 real ties: 49 scored differently by argument order (BrowserStack founders 91.3 vs 93.7),
+    because "Lime Labs LLC" matched "Lime Spot Technology India Pvt Ltd" as a word subset."""
+    from warmpath.score import find_overlaps
+    s = lambda co, st, en, ref: Stint(co, None, None, date(*st), date(*en), ref=ref)
+    a = Person("Ritesh A", 1, stints=[s("Lime Labs LLC", (2007, 2, 1), (2009, 4, 1), "a0"),
+                                      s("QuarkBase.com", (2007, 12, 1), (2010, 7, 1), "a1")])
+    b = Person("Nakul A", 2, stints=[s("Lime Spot Technology India Pvt. Ltd.", (2007, 2, 1), (2009, 1, 1), "b0"),
+                                     s("Quarkbase.com", (2007, 12, 1), (2010, 7, 1), "b1")])
+    assert [o.company_name for o in find_overlaps(a, b)] == ["QuarkBase.com"]
+    assert score_tie(a, b).score == score_tie(b, a).score
