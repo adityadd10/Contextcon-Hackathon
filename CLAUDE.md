@@ -1,13 +1,15 @@
 # WarmPath: notes for Claude Code sessions
 
 Hackathon project (ContextCon IIT Bombay, Crustdata track, code freeze 15:30 IST, 31 Oct 2026).
-Three people build in parallel. **The full spec, file ownership and contracts are in [docs/PLAN.md](docs/PLAN.md). Read it first.**
+Three people build in parallel. **Read [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) first** (work split, file ownership, deliverables, judging criteria),
+then [docs/PLAN.md](docs/PLAN.md) (technical spec, algorithms, API notes, function signatures).
+Log what you try and what fails in [NOTES.md](NOTES.md). Judges ask about it.
 
 ## Rules
 - Python 3.12, `uv`. Run things with `uv run ...`. Add deps with `uv add` (tell the team).
 - Shared contracts: `warmpath/models.py` (dataclasses), the event schema in PLAN §6, the function signatures in PLAN §6.
   Add fields freely. Don't rename or remove without asking.
-- Only edit the files your member owns (PLAN §5). Small commits, `git pull --rebase` before pushing.
+- Only edit the files your member owns (TEAM_GUIDE §4). Small commits, `git pull --rebase` before pushing.
 - The social graph lives in `warmpath/graphdb.py` (`GraphStore`, SQLite at data/graph.db). Read/write it only through that class.
 - All Crustdata calls go through `warmpath/crust.py` (`Crust` client). Never call httpx directly, or you lose
   retries, pacing, caching, the credit budget and the audit trail.

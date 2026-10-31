@@ -1,5 +1,7 @@
 # WarmPath: build plan (ContextCon IIT Bombay, Crustdata track)
 
+> Team logistics, deliverables and judging criteria: see [TEAM_GUIDE.md](TEAM_GUIDE.md). This file is the technical spec.
+
 > **One line:** Type who you want to reach. WarmPath finds the people who actually worked
 > alongside them, scores how well each pair knows each other, and hands you a ready-to-forward intro
 > request. Every link is backed by Crustdata records you can click and check.

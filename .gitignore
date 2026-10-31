@@ -6,3 +6,5 @@ reports/
 *.pyc
 outbox/
 data/
+*.pdf
+.pytest_cache/
