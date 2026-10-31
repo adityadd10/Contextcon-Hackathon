@@ -6,6 +6,21 @@ Aditya's Claude Code appends an entry each improvement loop (about every 25 min 
 
 ---
 
+## 14:50 · Final check: loop closed ✅
+
+`main` is green: **206 tests · eval 28/28 · 0 crashes · 0 silent failures · 0 false ties · 0 unsupported claims · paraphrase 100%**.
+Live server verified (`/api/health`: `fake:false`, key present). Facebook, Zepto, Razorpay, Groww, CRED and Meesho all resolve live.
+
+⚠️ **UI showing "Demo data" / "No company matches 'Facebook'"?** The server was started with `WARMPATH_FAKE=1` still set in that
+terminal (the offline world has only 4 companies). Fix: `unset WARMPATH_FAKE && uv run warmpath serve`. The warning now says this itself.
+
+🔴 **Apurba:** `demo/record_clips.py` and `demo/make_video.py` still don't set privacy mode. Record with `WARMPATH_MASK_NAMES=1` in the
+environment, and watch the final video once for any stranger's full name before it's submitted.
+
+No further changes before 15:30 except demo-breaking bugs. Good luck on stage. 🎤
+
+---
+
 ## 14:22 · 🧊 FEATURE FREEZE at 14:30: final pre-freeze check ✅
 
 **State of `main`:** 205 tests green · eval **28/28** · 0 crashes · 0 silent failures · 0 false ties · 0 unsupported claims ·
