@@ -83,15 +83,19 @@ def check_claims(text: str, path: IntroPath) -> list[str]:
     return bad
 
 
-def _shared(t: Tie, you: bool = True) -> str:
-    who = "you two" if you else "they"
+def _fact(t: Tie) -> str:
+    """What two people share, without saying who: 'overlapped at X (2017–2020)'."""
     if t.overlaps:
         o = t.overlaps[0]
-        return f"{who} overlapped at {o.company_name} ({o.start.year}–{o.end.year})"
+        return f"overlapped at {o.company_name} ({o.start.year}–{o.end.year})"
     cls = next((f for f in t.factors if f.name == "classmates"), None)
     if cls:
-        return f"{who} were at {cls.value} at the same time"
-    return f"{who} crossed paths"
+        return f"were at {cls.value} at the same time"
+    return "crossed paths"
+
+
+def _shared(t: Tie, you: bool = True) -> str:
+    return f"{'you two' if you else 'they'} {_fact(t)}"
 
 
 def _full(p: Person) -> str:
@@ -107,18 +111,31 @@ def template(path: IntroPath, spec: TargetSpec) -> Draft:
         name = _full(path.nodes[-1]) if path.nodes else "the target"
         return Draft(path_rank=path.rank, to="(nobody)", subject=f"Intro to {name}?", body="", forwardable_blurb="",
                      claims_unsupported=["No connector on this path, so there is no one to ask for an intro"])
-    target, connector = path.nodes[-1], path.nodes[-2]
+    # Write to the first person on the path you can actually reach, and state every hop with its own pair:
+    #   [connector, target]            -> to connector: "you two overlapped at ..."
+    #   [you, c1, target]              -> to c1: "we overlapped at ...", "you and <target> overlapped at ..."
+    #   [you, c1, c2, ..., target]     -> to c1: our hop, then c1-c2, ..., ck-target; ask c1 to pass it to c2
+    target, nodes, ties = path.nodes[-1], path.nodes, path.ties
+    sender = nodes[0] if len(nodes) >= 3 else None
+    connector = nodes[1] if sender else nodes[0]          # who receives this draft
+    forwarder = nodes[-2]                                  # who finally hands the blurb to the target
     role = target.current_title or "their current role"
-    sender = path.nodes[0] if len(path.nodes) >= 3 else None
-    opener = (f"We overlapped at {path.ties[0].overlaps[0].company_name}, so I hope this isn't too out of the blue. "
-              if sender and path.ties[0].overlaps else "")
+    opener = f"We {_fact(ties[0])}, so I hope this isn't too out of the blue. " if sender else ""
+    if len(nodes) <= 3:
+        why = f"I noticed {_shared(ties[-1])}, so you might be the right person to ask."
+        ask = "Would you be open to forwarding the short note below? Totally fine if not."
+    else:
+        hops = [f"you and {_full(nodes[2])} {_fact(ties[1])}"]
+        hops += [f"{_full(a)} and {_full(b)} {_fact(t)}" for a, b, t in zip(nodes[2:-1], nodes[3:], ties[2:])]
+        why = "The closest path I can find goes through you: " + ", then ".join(hops) + "."
+        ask = (f"Would you be open to passing the short note below to {_first(nodes[2])}, "
+               f"so it can reach {_first(target)}? Totally fine if not.")
     body = (f"Hi {_first(connector)},\n\n{opener}"
-            f"I'm hoping to reach {_full(target)} ({role}) {ASK[spec.purpose]}. "
-            f"I noticed {_shared(path.ties[-1])}, so you might be the right person to ask.\n\n"
-            f"Would you be open to forwarding the short note below? Totally fine if not.\n\nThanks!\n"
+            f"I'm hoping to reach {_full(target)} ({role}) {ASK[spec.purpose]}. {why}\n\n"
+            f"{ask}\n\nThanks!\n"
             f"{'[' + sender.name + ']' if sender else '[Your name]'}")
     blurb = (f"Hi {_first(target)}, a quick intro request: [Your name] would love a short call "
-             f"{ASK[spec.purpose]}. {_first(connector)} suggested you'd be the right person.")
+             f"{ASK[spec.purpose]}. {_first(forwarder)} suggested you'd be the right person.")
     d = Draft(path_rank=path.rank, to=connector.name, subject=f"Intro to {target.name}?", body=body,
               forwardable_blurb=blurb, citations=_citations(path))
     _verify(d, path)

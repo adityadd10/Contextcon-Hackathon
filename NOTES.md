@@ -199,3 +199,8 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
 - 13:10 · Aditya · searched the live graph for the strongest team-reachable senior target → a VC general partner via Apurba's
   small-startup colleague. While checking it, found that multi-hop drafts were addressed to the last connector instead of the
   sender's own contact. Privacy: the repo is public, so third-party names now stay out of tracked files (demo specifics are kept locally).
+- 15:00 · B · bug from Aditya (visible in the demo): on a 3+ hop path the draft went to the LAST connector but opened
+  "we overlapped at…" about the sender's tie with the FIRST connector. Every fact true, wrong pair. → the draft now goes
+  to the first connector (the only person the sender knows), states each hop with its own pair ("you and Rahul
+  overlapped at Beta, then Rahul and Priya overlapped at TinyCo"), and asks them to pass the note one hop on; the
+  forwardable blurb names the last connector, who hands it to the target. 2- and 3-node drafts unchanged. Tests added.

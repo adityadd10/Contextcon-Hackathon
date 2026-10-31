@@ -93,3 +93,44 @@ def test_verified_path_gets_footer(monkeypatch):
     monkeypatch.setattr(llm, "available", lambda: False)
     d = asyncio.run(draft_intro(_path(), TargetSpec(raw="x")))
     assert d.forwardable_blurb.endswith("(verified via Crustdata)") and not d.claims_unsupported
+
+
+def _hop_path():
+    """you -> Asha (Acme) -> Rahul (Beta) -> Priya (TinyCo): a 3-hop chain from the graph."""
+    from warmpath.models import IntroPath
+    from warmpath.score import score_tie
+    S = lambda co, cid, s, e, ref: Stint(co, cid, "Engineer", date(*s), date(*e), company_headcount=40, ref=ref)
+    me = Person("Vaibhav N", 1, source_endpoint="e", stints=[S("Acme", 10, (2018, 1, 1), (2021, 1, 1), "m0")])
+    asha = Person("Asha Rao", 2, source_endpoint="e", stints=[S("Acme", 10, (2018, 6, 1), (2020, 6, 1), "a0"),
+                                                               S("Beta", 20, (2020, 7, 1), (2023, 1, 1), "a1")])
+    rahul = Person("Rahul Mehta", 3, source_endpoint="e", stints=[S("Beta", 20, (2021, 1, 1), (2022, 6, 1), "r0"),
+                                                                   S("TinyCo", 30, (2022, 7, 1), (2025, 1, 1), "r1")])
+    priya = Person("Priya Raman", 4, current_title="Head of Data", source_endpoint="e",
+                   stints=[S("TinyCo", 30, (2022, 1, 1), (2025, 6, 1), "p0")])
+    nodes = [me, asha, rahul, priya]
+    ties = [score_tie(a, b) for a, b in zip(nodes, nodes[1:])]
+    for t in ties:
+        t.verified = True
+    return IntroPath(nodes, ties, 60, "", rank=1)
+
+
+def test_multi_hop_draft_goes_to_the_person_you_know_and_attributes_each_hop():
+    """Aditya, 14:xx: the draft went to the last connector but said 'we overlapped at' about the first one."""
+    d = template(_hop_path(), TargetSpec(raw="x"))
+    assert d.to == "Asha Rao" and d.body.startswith("Hi Asha,")
+    assert "We overlapped at Acme" in d.body                                  # me <-> Asha: true
+    assert "you and Rahul Mehta overlapped at Beta" in d.body                 # Asha <-> Rahul: true
+    assert "Rahul Mehta and Priya Raman overlapped at TinyCo" in d.body       # Rahul <-> Priya: true
+    assert "you two overlapped at TinyCo" not in d.body                       # the old misattribution
+    assert "passing the short note below to Rahul" in d.body
+    assert "Rahul suggested" in d.forwardable_blurb                           # Rahul hands it to Priya
+    assert d.claims_unsupported == []
+
+
+def test_two_and_three_node_drafts_unchanged():
+    p3 = _path(with_seed=True)
+    d = template(p3, TargetSpec(raw="x"))
+    assert d.to == p3.nodes[1].name and "We overlapped at Acme" in d.body and "you two overlapped at TinyCo" in d.body
+    p2 = _path()
+    d = template(p2, TargetSpec(raw="x"))
+    assert d.to == "Rahul Mehta" and "We overlapped" not in d.body
