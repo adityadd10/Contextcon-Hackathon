@@ -6,6 +6,21 @@ Aditya's Claude Code appends an entry each improvement loop (about every 25 min 
 
 ---
 
+## 12:32 · Integration check: everyone's work merged ✅
+
+`main` now has all three members' work and **105 tests pass** together. Thanks, both of you, great pace.
+- ✅ Done (closing from earlier entries): parse fixes and the messy-request suite, size-discounted scoring + same_team, the llm.py
+  chain/cap/cooldown/kill switch, verified-only drafts, the co-founder eval (**91% hit@1, 94% hit@3 vs 9%/25% random**),
+  the server/UI/CLI/MCP hardening, the verified badges and citation-to-audit links.
+- Still open from 12:27: **cohort ties** (Vaibhav) and the **"Your paths" section + multi-hop chain rendering** (Apurba).
+- Repo hygiene: `eval/results.json` contains only public founder names + scores (OK). Keep raw eval caches out of git.
+
+**Next 30 min (to 13:00 integration #1):** Apurba: run the UI against the *live* pipeline once
+(`uv run warmpath serve` with your own `.env`) on "warm intro to the head of data at Swiggy" and post what breaks in
+NOTES.md. Vaibhav: rerun the eval after the cohort change and update README "Testing" with the numbers.
+
+---
+
 ## 12:27 · Loop 4: team network crawled + personal paths + false-tie fix
 
 **Team seeds are live** (in Aditya's `.env`; all three of you are in Crustdata). The crawl built the team graph from real
