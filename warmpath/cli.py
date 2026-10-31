@@ -161,7 +161,17 @@ def _run(argv: list[str]) -> int:
         return 0
     if argv[:1] == ["serve"]:
         import uvicorn
-        opts = _opts(argv[1:])
+        args = argv[1:]
+        # live by default: a WARMPATH_FAKE=1 left over in the shell must not silently switch the app to demo data
+        if "--fake" in args:
+            args.remove("--fake")
+            os.environ["WARMPATH_FAKE"] = "1"
+        elif os.getenv("CRUSTDATA_API_KEY"):
+            os.environ.pop("WARMPATH_FAKE", None)
+        mode = "DEMO data (offline)" if os.getenv("WARMPATH_FAKE") == "1" else (
+            "LIVE Crustdata" if os.getenv("CRUSTDATA_API_KEY") else "no CRUSTDATA_API_KEY (add it to .env)")
+        console.print(f"[bold]WarmPath[/] · mode: [green]{mode}[/]")
+        opts = _opts(args)
         uvicorn.run("warmpath.server:app", host=opts.get("--host", "127.0.0.1"),
                     port=_num(opts, "--port", 8000, 1, 65535, int))
         return 0
