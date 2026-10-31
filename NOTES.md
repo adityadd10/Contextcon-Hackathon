@@ -164,3 +164,7 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
 - 12:45 · Apurba · how the server learns the run_id without touching pipeline.py: the pipeline writes reports/<run_id>.json
   *before* emitting `done`, so the server matches the newest report for the same request and tags `done` with it.
   8 new tests (114 total).
+- 12:50 · Aditya · built a product eval harness instead of LangSmith: our pipeline is mostly deterministic graph/API logic,
+  LangSmith would ship real people's career data to a SaaS, and judges couldn't rerun it. Local gold scenarios + scorecard +
+  history instead. Its first live run caught 2 bugs the offline world missed ("swigy" → lookalike "swigym"; claim checker false
+  positive on "Pvt.") and one product flaw (paraphrase consistency 67%).

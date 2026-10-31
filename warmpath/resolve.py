@@ -43,27 +43,42 @@ async def resolve_company(c: Crust, query: str, emit: Emit) -> Company | None:
     else:
         matches = await attempt(q, names=[q])
         clean = " ".join(LEGAL.sub("", q).split()).title()
-        if not matches and clean and clean != q:
-            matches = await attempt(clean, names=[clean])
+        norm = lambda n: re.sub(r"[^a-z0-9]", "", LEGAL.sub("", n or "").lower())
+        exact = lambda ms: any(norm(to_company(m).name) == norm(clean or q) for m in ms)
+        # identify is fuzzy: "swigy" returns a tiny lookalike "swigym". Unless a candidate's name matches exactly, keep
+        # gathering candidates down the chain (all free except the 1-credit web search) and pick the best overall.
+        if not exact(matches) and clean and clean != q:
+            matches += await attempt(clean, names=[clean])
         slug = re.sub(r"[^a-z0-9]", "", clean.lower())
-        if not matches and slug:
-            matches = await attempt(f"{slug}.com/.in/.io/.ai",
-                                    domains=[f"{slug}.com", f"{slug}.in", f"{slug}.io", f"{slug}.ai"])
-        if not matches and slug:  # typos ("swigy") and unusual names: let web search find the company page
+        if not exact(matches) and slug:
+            matches += await attempt(f"{slug}.com/.in/.io/.ai",
+                                     domains=[f"{slug}.com", f"{slug}.in", f"{slug}.io", f"{slug}.ai"])
+        if not exact(matches) and slug:  # typos and unusual names: let web search find the company page
             try:
                 res = await c.web_search(f"{clean or q} company", site="linkedin.com/company")
                 url = next((r["url"] for r in res.get("results") or [] if "linkedin.com/company/" in r.get("url", "")), None)
             except CrustError:
                 url = None
             if url:
-                matches = await attempt(url, profile_urls=[url])
+                matches += await attempt(url, profile_urls=[url])
     if not matches:
         ev.warn(emit, f"No company in Crustdata matches '{q}' (tried: {'; '.join(tried)})")
         return None
-    cands = [to_company(m) for m in matches[:5]]
-    # prefer the strongest match, then the closest name, then the biggest company (the famous one is usually meant)
-    best = max(cands, key=lambda co: ((co.confidence or 0), fuzz.ratio(co.name.lower(), q.lower()),
-                                      _range_low(co.employee_count_range)))
+    seen, cands = set(), []
+    for m in matches:
+        co = to_company(m)
+        if co.company_id not in seen:
+            seen.add(co.company_id)
+            cands.append(co)
+    qn = re.sub(r"[^a-z0-9]", "", LEGAL.sub("", q).lower())
+
+    def rank(co: Company) -> tuple:
+        cn = re.sub(r"[^a-z0-9]", "", LEGAL.sub("", co.name).lower())
+        sim = fuzz.ratio(cn, qn)
+        # exact name first; then "close enough" names ordered by real size (the famous one is usually meant: a
+        # 10,001+ Swiggy beats a sizeless 'swigym'), then confidence and similarity
+        return (cn == qn, sim >= 80, _range_low(co.employee_count_range), co.confidence or 0, sim)
+    best = max(cands, key=rank)
     if len(tried) > 1:
         ev.step(emit, "resolve", "progress", f"'{q}' resolved via fallback",
                 f"→ {best.name} after: {' → '.join(tried)}")

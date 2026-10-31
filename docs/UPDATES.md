@@ -6,6 +6,51 @@ Aditya's Claude Code appends an entry each improvement loop (about every 25 min 
 
 ---
 
+## 12:52 · Loop 6: product eval harness + headcount history wired in
+
+**New: `eval/run_eval.py` + `eval/scenarios.py`** (Aditya). 28 gold scenarios (19 offline fake-world + 9 live) across the edge-case
+categories: happy path · messy input · ambiguity · no answer · hostile input · network logic. Each run is scored from the event
+stream + audit trail and written to **`eval/scorecard.md`**, with one line appended to **`eval/history.jsonl`** (git sha +
+metrics, person ids only), so every change can be judged better or worse with a delta against the previous run.
+
+```bash
+uv run python -m eval.run_eval --fake    # 0 credits, deterministic: RUN BEFORE EVERY PUSH
+uv run python -m eval.run_eval           # + live scenarios (cached responses, new requests cost credits)
+uv run python -m eval.run_eval --llm     # LLM parity check
+```
+Quality gates per scenario: one `done`, no error, no silent failure, expectations met, 0 false ties, 0 unsupported draft claims,
+100% citation coverage, 100% verified ties. Product metrics: paraphrase consistency, path-found rate, warm-path rate (through
+our own team), median best-path strength, co-founder hit@1/@3 (read from Vaibhav's `eval/results.json`), credits per verified
+path, p95 latency, graph-memory recall, target freshness, explained-path rate.
+
+**Current scorecard: 27/28 pass (96%).** 100% completion, 0 silent failures, 0 crashes, 0 false ties, 100% citation/verified/
+traceable, co-founder hit@1 91%. Open: **paraphrase consistency 67%** and **1 unsupported draft claim** (both below).
+
+**Also changed (Aditya):**
+- `headcount.load()` wired into the pipeline before scoring, as Vaibhav asked: target's + seeds' employers, ≤25 per batched call,
+  failures fall back to latest size. Live: 19/19 employers had history.
+- 🐞 "Various Startups" / "Stealth Startup" / "Consulting" etc. created false ties (seen live on the Zepto CTO) → placeholder
+  employer filter widened, with tests. Real names like "Stealth Health Inc" are kept.
+- 🐞 Company typo "swigy" resolved to a sizeless lookalike "swigym" → the resolver now keeps gathering candidates down the
+  fallback chain until it has an exact name match, then ranks by exact name → close name → real size.
+
+### Vaibhav (Member B): do these (they're the 2 red items on the scorecard)
+1. **`draft.check_claims` false positive (fails L06):** the sentence splitter breaks at abbreviations, so
+   *"I noticed you two overlapped at 3 Embed Software Technologies Pvt."* is flagged unsupported although it's true
+   (the evidence has "…Pvt. Ltd."). Don't split on `Pvt.|Ltd.|Inc.|Co.|Corp.|Pte.|Jr.|Sr.|Dr.|Mr.|Ms.|St.|No.`, or match
+   company names before splitting. Repro: `uv run python -m eval.run_eval --only L06`.
+2. **Paraphrase consistency 67% (group `live-swiggy-data`):** `"teh data guy at swigy pls"` parses role=`data` while
+   `"head of data at Swiggy"` parses `head of data`, so different people are picked. Map *"X guy/girl/person/lead/wala/boss at"*
+   → `head of X` in the rule parser. Repro: `--only L01,L02`.
+3. Add `## Evaluation` to the README pointing at `eval/scorecard.md` + the three commands above (judges: "how you know it works").
+
+### Apurba (Member C): do these
+1. In the demo video, show `eval/scorecard.md` for 5–8 s at the end. "28 scenarios, 0 silent failures, 0 false ties, co-founder
+   found #1 in 91%" is our *testing* answer.
+2. Optional UI: a small "Eval" link in the footer that renders `eval/scorecard.md` (served read-only by the server).
+
+---
+
 ## 12:58 · Loop 5: edge-case hardening, then live edge cases (no crashes, no hangs, no silent failures)
 
 Ran a 35-input adversarial sweep (empty, emoji, SQL/HTML/rich-markup injection, Hindi/Hinglish, 5,000-char, NUL bytes,

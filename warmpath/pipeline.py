@@ -9,6 +9,7 @@ import uuid
 from pathlib import Path
 
 from . import events as ev
+from . import headcount
 from .crust import Crust, CrustError
 from .discover import find_connectors, load_seeds
 from .draft import draft_intro, write_outbox
@@ -83,6 +84,16 @@ async def run(request: str, emit: Emit | None = None, *, crust: Crust | None = N
 
         # 4 score + 5 paths
         ev.step(emit, "score", "start", "Scoring how closely each pair worked together")
+        # company size *during* each overlap (Vaibhav's headcount history): target's employers first, then the
+        # seeds' (2-hop ties); one batched /company/enrich, cached, ~2 credits per company
+        hc_ids = list(dict.fromkeys([s.company_id for s in target.stints if s.company_id] +
+                                    [s.company_id for sd in seeds for s in sd.stints if s.company_id]))[:25]
+        try:
+            n_hist = await headcount.load(c, hc_ids)
+            ev.step(emit, "score", "progress", "Loaded headcount history",
+                    f"{n_hist}/{len(hc_ids)} employers have size-over-time data (company size during each overlap)")
+        except Exception as e:  # history is an enhancement: scoring falls back to latest headcount
+            ev.warn(emit, f"Headcount history unavailable ({type(e).__name__}); using latest company size")
         paths = build_paths(target, connectors, seeds, spec)
         paths = _merge(paths, graph_paths(g, target, seeds), spec, seeds)
         emitted: set[int | None] = set()

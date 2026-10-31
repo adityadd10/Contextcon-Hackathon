@@ -77,3 +77,11 @@ def test_bare_company_and_acronym_role_are_understood():
     (t1, co1), _ = asyncio.run(go())
     assert co1 and co1.name == "Swiggy"
     assert any("Treating 'Swiggy' as a company" in e.get("label", "") for e in ev)
+
+
+@pytest.mark.parametrize("name,generic", [("Various Startups", True), ("Stealth Startup", True), ("Self Employed", True),
+                                          ("Confidential Company", True), ("Freelancer", True), ("Swiggy", False),
+                                          ("Stealth Health Inc", False), ("Startup India", False)])
+def test_placeholder_employers_never_create_ties(name, generic):
+    from warmpath.crust import is_generic_employer
+    assert is_generic_employer(name) is generic

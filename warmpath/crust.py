@@ -246,8 +246,10 @@ def _stint(raw: dict, ref: str, is_current: bool) -> Stint:
 
 
 GENERIC_EMPLOYERS = re.compile(
-    r"^\s*(self[\s-]?employed|freelanc\w*|independent( consultant)?|stealth( mode)?( startup)?|confidential|"
-    r"various|n/?a|none|unemployed|career break|own business|personal|private practice|startup)\s*$", re.I)
+    r"^\s*(self[\s-]?employed|freelanc\w*|independent( \w+)?|stealth( mode)?( \w+)?|confidential( \w+)?|"
+    r"undisclosed( \w+)?|various( \w+)*|multiple( \w+)*|several( \w+)*|n/?a|none|unemployed|career break|"
+    r"sabbatical|own business|my own \w+|personal( \w+)?|private practice|startup|start-?ups?|consulting|"
+    r"consultant|contract(or)?|family business|looking for \w+.*|open to work|student)\s*\.?\s*$", re.I)
 
 
 def is_generic_employer(name: str | None) -> bool:

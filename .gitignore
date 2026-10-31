@@ -9,3 +9,5 @@ data/
 *.pdf
 .pytest_cache/
 .claude/
+eval/.fake_graph.db*
+eval/data/
