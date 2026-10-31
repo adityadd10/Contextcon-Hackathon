@@ -1,4 +1,11 @@
-"""CLI: uv run warmpath "warm intro to the head of data at Swiggy via IIT Bombay alumni".  Owner: Member C (v1 stub)."""
+"""CLI: uv run warmpath "warm intro to the head of data at Swiggy via IIT Bombay alumni".  Owner: Member C.
+
+    warmpath "<request>"                      find warm paths (live steps, cited ties, drafts to outbox/)
+    warmpath crawl --seeds <url>,<url> --depth 2 --budget 80
+    warmpath graph stats | knows <id> | path <from> <to> | brokers | export
+    warmpath serve [--port 8000]              web UI
+    warmpath mcp                              MCP server (stdio)
+"""
 from __future__ import annotations
 
 import asyncio
@@ -15,7 +22,9 @@ ICON = {"start": "[cyan]…[/]", "progress": "[blue]·[/]", "done": "[green]✓[
 
 def show(e: dict) -> None:
     t = e["type"]
-    if t == "step":
+    if t == "step" and e["status"] == "progress":
+        console.print(f"    [blue]·[/] {e['label']} [dim]{e.get('detail', '')}[/]")
+    elif t == "step":
         console.print(f"{ICON.get(e['status'], '·')} [bold]{e['label']}[/] [dim]{e.get('detail', '')}[/]")
     elif t == "warning":
         console.print(f"[yellow]! {e['message']}[/]")
@@ -29,6 +38,11 @@ def show(e: dict) -> None:
             for fct in tie["factors"]:
                 cites = ", ".join(x["ref"] for x in fct["evidence"][:2])
                 console.print(f"     +{fct['contribution']:>4} {fct['explanation']} [dim]{cites}[/]")
+    elif t == "draft":
+        d = e["draft"]
+        bad = d.get("claims_unsupported") or []
+        check = f"[red]{len(bad)} unsupported claim(s)[/]" if bad else f"[green]✓ {d['claims_checked']} claims cited[/]"
+        console.print(f"  [bold]draft → {d['to']}[/] [dim]({d['subject']})[/] {check}")
     elif t == "done":
         r = e["result"]
         console.print(f"\n[dim]{len(r['audit'])} API calls · {r['credits_used']} credits · {r['elapsed_s']}s · "
@@ -76,6 +90,13 @@ def main() -> None:
         return asyncio.run(_crawl(argv[1:]))
     if argv[:1] == ["graph"]:
         return _graph(argv[1:])
+    if argv[:1] == ["serve"]:
+        import uvicorn
+        opts = dict(zip(argv[1::2], argv[2::2]))
+        return uvicorn.run("warmpath.server:app", host=opts.get("--host", "127.0.0.1"), port=int(opts.get("--port", 8000)))
+    if argv[:1] == ["mcp"]:
+        from .mcp_server import main as mcp_main
+        return mcp_main()
     q = " ".join(argv) or input("Who do you want to reach? ")
     asyncio.run(run(q, show))
 
