@@ -123,7 +123,8 @@ class FakeCrust:
                 ms = [{"confidence_score": 0.9, "company_data": {"crustdata_company_id": cid, "basic_info": {
                     "crustdata_company_id": cid, **{k: c[k] for k in ("name", "primary_domain", "employee_count_range")}}}}
                       for cid, c in COMPANIES.items()
-                      if str(v).lower() in (c["name"].lower(), c["primary_domain"])]
+                      if str(v).lower() in (c["name"].lower(), c["primary_domain"],
+                                            f"https://www.linkedin.com/company/{c['primary_domain'].split('.')[0]}")]
                 out.append({"matched_on": v, "match_type": key[:-1], "matches": ms})
             return httpx.Response(200, json=out, headers={"x-credits-used": "0"})
         if path == "/person/search":
@@ -145,6 +146,11 @@ class FakeCrust:
         if path == "/web/search/live":
             q = body["query"]
             res = []
+            if body.get("site") == "linkedin.com/company":
+                from rapidfuzz import fuzz
+                term = q.replace(" company", "").lower()
+                res = [{"source": "web", "title": c["name"], "url": f"https://www.linkedin.com/company/{c['primary_domain'].split('.')[0]}",
+                        "snippet": "", "position": 1} for c in COMPANIES.values() if fuzz.ratio(term, c["name"].lower()) >= 75]
             if "Rahul Verma" in q and "Priya Sharma" in q:
                 res = [{"source": "web", "title": "Rahul Verma and Priya Sharma talk data at Tiny Analytics",
                         "url": "https://blog.tinyanalytics.io/team", "snippet": "Rahul Verma and Priya Sharma ...",

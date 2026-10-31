@@ -15,26 +15,57 @@ SENIORITY = [("chief", 6), ("cxo", 6), ("cto", 6), ("ceo", 6), ("founder", 5), (
 STOP = {"the", "of", "at", "for", "and", "whoever", "runs", "leads", "heads", "person", "someone", "guy", "girl"}
 
 
+LEGAL = re.compile(r"\b(inc|llc|ltd|limited|pvt|private|corp|corporation|technologies|technology|labs|co)\b\.?", re.I)
+
+
 async def resolve_company(c: Crust, query: str, emit: Emit) -> Company | None:
-    q = query.strip()
-    try:
-        if re.search(r"linkedin\.com/company/", q):
-            rows = await c.company_identify(profile_urls=[q])
-        elif re.fullmatch(r"(https?://)?(www\.)?[\w\-]+\.[a-z.]{2,}/?", q, re.I):
-            rows = await c.company_identify(domains=[re.sub(r"^(https?://)?(www\.)?", "", q).strip("/")])
-        else:
-            rows = await c.company_identify(names=[q])
-    except CrustError as e:
-        ev.warn(emit, f"Company identify failed for '{q}': {e.message}")
-        return None
-    matches = (rows[0].get("matches") if rows else None) or []
+    """Resolve a messy company mention. Fallback chain, cheapest first:
+    identify(as typed) → identify(cleaned name) → identify(guessed domains) → web search for the company page →
+    identify(profile URL). Identify calls are free; the web search costs 1 credit."""
+    q = query.strip().strip(".,")
+    tried: list[str] = []
+
+    async def attempt(label: str, **kw) -> list[dict]:
+        tried.append(label)
+        try:
+            rows = await c.company_identify(**kw)
+        except CrustError as e:
+            ev.warn(emit, f"Company identify failed for '{label}': {e.message}")
+            return []
+        return [m for row in rows or [] for m in (row.get("matches") or [])]
+
+    matches: list[dict] = []
+    if re.search(r"linkedin\.com/company/", q):
+        matches = await attempt(q, profile_urls=[q])
+    elif re.fullmatch(r"(https?://)?(www\.)?[\w\-]+\.[a-z.]{2,}/?", q, re.I):
+        matches = await attempt(q, domains=[re.sub(r"^(https?://)?(www\.)?", "", q).strip("/")])
+    else:
+        matches = await attempt(q, names=[q])
+        clean = " ".join(LEGAL.sub("", q).split()).title()
+        if not matches and clean and clean != q:
+            matches = await attempt(clean, names=[clean])
+        slug = re.sub(r"[^a-z0-9]", "", clean.lower())
+        if not matches and slug:
+            matches = await attempt(f"{slug}.com/.in/.io/.ai",
+                                    domains=[f"{slug}.com", f"{slug}.in", f"{slug}.io", f"{slug}.ai"])
+        if not matches and slug:  # typos ("swigy") and unusual names: let web search find the company page
+            try:
+                res = await c.web_search(f"{clean or q} company", site="linkedin.com/company")
+                url = next((r["url"] for r in res.get("results") or [] if "linkedin.com/company/" in r.get("url", "")), None)
+            except CrustError:
+                url = None
+            if url:
+                matches = await attempt(url, profile_urls=[url])
     if not matches:
-        ev.warn(emit, f"No company in Crustdata matches '{q}'")
+        ev.warn(emit, f"No company in Crustdata matches '{q}' (tried: {'; '.join(tried)})")
         return None
     cands = [to_company(m) for m in matches[:5]]
-    # prefer the strongest name match, then the biggest company (the famous one is usually meant)
+    # prefer the strongest match, then the closest name, then the biggest company (the famous one is usually meant)
     best = max(cands, key=lambda co: ((co.confidence or 0), fuzz.ratio(co.name.lower(), q.lower()),
                                       _range_low(co.employee_count_range)))
+    if len(tried) > 1:
+        ev.step(emit, "resolve", "progress", f"'{q}' resolved via fallback",
+                f"→ {best.name} after: {' → '.join(tried)}")
     return best
 
 
@@ -67,9 +98,22 @@ async def resolve_target(c: Crust, spec: TargetSpec, emit: Emit) -> tuple[Person
         return None, company
 
     people = [to_person(p, "/person/search") for p in cands]
-    best = max(people, key=lambda p: _target_rank(p, spec, company))
+    ranked = sorted(people, key=lambda p: -_target_rank(p, spec, company))
+    best = ranked[0]
+    why = []
+    if company and any(st.is_current and st.company_id == company.company_id for st in best.stints):
+        why.append(f"currently at {company.name}")
+    elif company and any(st.company_id == company.company_id for st in best.stints):
+        why.append(f"was at {company.name} (may have moved on)")
+        ev.warn(emit, f"{best.name} is no longer at {company.name} according to Crustdata. The intro may be outdated.")
+    if spec.role:
+        why.append(f"title '{best.current_title}' best matches '{spec.role}'")
     ev.step(emit, "resolve", "progress", "Picked target",
-            f"{best.name} · {best.current_title or ''} (from {len(people)} candidates)")
+            f"{best.name} · {best.current_title or ''} (best of {len(people)} candidates"
+            + (f"; {', '.join(why)}" if why else "") + ")")
+    if len(ranked) > 1 and spec.person_name and not company:
+        ev.warn(emit, f"{len(ranked)} people match '{spec.person_name}' and no company was given. "
+                      f"Picked {best.name} ({best.current_title}). Add the company to be sure.")
     # search profiles can be partial; enrich for the full dated career
     if best.profile_url:
         full = await enrich_one(c, best.profile_url, emit)

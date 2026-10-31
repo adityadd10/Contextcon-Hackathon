@@ -64,3 +64,60 @@ def test_unknown_company_and_redacted_profile_degrade_gracefully():
     assert r.target is None and any(e["type"] == "warning" for e in events)
     r, events, _ = go(f"intro to {REDACTED}")
     assert r.target is None and any("remove their data" in e.get("message", "") for e in events)
+
+
+def _resolve(q):
+    from warmpath.resolve import resolve_company
+    fake = FakeCrust(fail_first_with_429=False)
+
+    async def main():
+        async with Crust(api_key="x", use_cache=False, transport=fake.transport(), pace=False) as c:
+            return await resolve_company(c, q, lambda e: None)
+    return asyncio.run(main())
+
+
+@pytest.mark.parametrize("q", ["Swiggy", "swiggy", "Swiggy Pvt Ltd", "swiggy.com", "https://www.swiggy.com/",
+                               "Swigy", "Swigy Pvt Ltd", "https://www.linkedin.com/company/swiggy"])
+def test_company_aliases_and_typos(q):
+    co = _resolve(q)
+    assert co and co.company_id == 1001, q
+
+
+def test_name_only_ambiguity_is_explained():
+    from warmpath.models import TargetSpec
+    from warmpath.resolve import resolve_target
+    fake, events = FakeCrust(fail_first_with_429=False), []
+
+    async def main():
+        async with Crust(api_key="x", use_cache=False, transport=fake.transport(), pace=False) as c:
+            return await resolve_target(c, TargetSpec(raw="", person_name="Priya Sharma"), events.append)
+    target, _ = asyncio.run(main())
+    assert target is not None
+    assert any("people match 'Priya Sharma'" in e.get("message", "") for e in events)
+
+
+def test_budget_exhaustion_returns_partial_result_not_crash():
+    fake = FakeCrust(fail_first_with_429=False)
+    events = []
+
+    async def main():
+        async with Crust(api_key="x", use_cache=False, transport=fake.transport(), pace=False, budget=6) as c:
+            return await run("warm intro to whoever runs data at Swiggy via IITB", events.append, crust=c,
+                             graph=GraphStore("g.db"))
+    r = asyncio.run(main())
+    assert r.target is not None and r.credits_used <= 6
+    assert any(e["type"] in ("warning", "error") and "budget" in str(e).lower() for e in events)
+    assert events[-1]["type"] == "done"
+
+
+def test_crawl_grows_graph():
+    from warmpath.crawl import crawl
+    fake = FakeCrust(fail_first_with_429=False)
+
+    async def main():
+        async with Crust(api_key="x", use_cache=False, transport=fake.transport(), pace=False) as c:
+            g = GraphStore("g.db")
+            return await crawl(c, g, ["https://www.linkedin.com/in/aditya-seed"], depth=2), g
+    stats, g = asyncio.run(main())
+    assert stats["people"] >= 3 and stats["relationships"] >= 2
+    assert g.strongest_path(9, 1) == [9, 2, 1]       # seed → Rahul → Priya discovered by crawling alone

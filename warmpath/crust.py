@@ -160,7 +160,8 @@ class Crust:
                                 "fields": fields or ["crustdata_person_id", *PERSON_FIELDS]}
         if cursor:
             body["cursor"] = cursor
-        return await self.post("/person/search", body, est_credits=0.5 * limit)
+        # 0.03 base + 0.1 experience + 0.1 education (+0.1 per premium filter group): ~0.33/result upper-typical
+        return await self.post("/person/search", body, est_credits=0.33 * limit)
 
     async def company_identify(self, *, names: list[str] | None = None, domains: list[str] | None = None,
                                profile_urls: list[str] | None = None) -> list[dict]:

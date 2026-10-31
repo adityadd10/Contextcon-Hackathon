@@ -4,6 +4,7 @@ Hackathon project (ContextCon IIT Bombay, Crustdata track, code freeze 15:30 IST
 Three people build in parallel: Aditya (Member A), Vaibhav (Member B), Apurba (Member C). **Read [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) first** (work split, file ownership, deliverables, judging criteria),
 then [docs/PLAN.md](docs/PLAN.md) (technical spec, algorithms, API notes, function signatures).
 Log what you try and what fails in [NOTES.md](NOTES.md). Judges ask about it.
+Team instructions arrive in [docs/UPDATES.md](docs/UPDATES.md) (newest first). Check it after every `git pull`.
 
 ## Rules
 - Python 3.12, `uv`. Run things with `uv run ...`. Add deps with `uv add` (tell the team).
