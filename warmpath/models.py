@@ -183,6 +183,8 @@ class Draft:
     forwardable_blurb: str
     claims_checked: int = 0
     claims_unsupported: list[str] = field(default_factory=list)
+    citations: list[Evidence] = field(default_factory=list)      # the records the draft's facts come from
+    llm_rejected: list[str] = field(default_factory=list)        # LLM sentences dropped by check_claims
 
 
 @dataclass
