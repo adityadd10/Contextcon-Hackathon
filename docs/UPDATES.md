@@ -30,8 +30,9 @@ failure. **137 tests green.**
 7. `linkedin.com/in/x` without `https://` (and `in.linkedin.com/...?trk=`) is normalised.
 
 ### Apurba (Member C): do these
-1. **Security:** the sweep includes `<script>alert(1)</script>` and `[bold]` as names. Make sure `index.html` inserts *all*
-   Crustdata/user text with `textContent` (never `innerHTML`), including warnings, tooltips and graph labels. The CLI already escapes.
+1. **Security audit of the redesigned `index.html`: passed ✅.** Every `innerHTML` interpolation goes through `esc()`, URLs
+   go through `safeUrl()`, and vis-network 9.1.9 renders string tooltips as text. Keep it that way for anything new. Minor: graph
+   labels use `multi: "html"`, so an escaped name shows as `&lt;script&gt;` literally. Harmless, so leave it.
 2. The UI must treat `done` as the only end signal (it now always arrives), and show the `error` event text if one arrives
    before it. Test with the request `""` and `"intro to the CEO at Nonexistent Corp"`.
 3. Add 2 demo chips that show robustness live: `"Swiggy"` (→ co-founder) and `"warm intro to the CTO at zepto via iit bombay"`.
