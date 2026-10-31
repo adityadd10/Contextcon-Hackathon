@@ -85,7 +85,14 @@ def test_every_factor_carries_evidence():
     assert {"overlap_months", "company_size", "same_function", "same_location", "joined_together",
             "recency", "repeat_colleagues", "classmates"} <= names
     assert all(f.evidence for f in tie.factors), [f.name for f in tie.factors if not f.evidence]
-    assert tie.score == 100.0
+    assert 90 < tie.score < 100                  # strong, but not saturated
+
+
+def test_calibration_keeps_low_scores_and_spreads_strong_ones():
+    from warmpath.score import calibrate
+    assert calibrate(25) == 25 and calibrate(70) == 70 and calibrate(-5) == 0
+    assert 70 < calibrate(80) < calibrate(100) < calibrate(115) < calibrate(200) <= 100
+    assert calibrate(100) == 89.0
 
 
 def test_missing_end_date_is_capped_not_treated_as_current():

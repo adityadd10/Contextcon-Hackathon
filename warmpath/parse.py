@@ -77,12 +77,14 @@ async def parse_request(text: str) -> TargetSpec:
         spec.person_name = name
         if spec.role and spec.role.lower() == name.lower():
             spec.role = None
+    # rules are the base: the LLM fills gaps, or fixes a typo / vague role the rules already found
     company = _str(data.get("company"))
-    if company and not spec.profile_url and (_in_text(company, text, 80) or not spec.company):
-        if not COMPANY_URL_RE.search(spec.company or ""):  # never replace a URL the user pasted
+    if company and not spec.profile_url and _in_text(company, text, 80):
+        if not spec.company or (not COMPANY_URL_RE.search(spec.company)
+                                and fuzz.ratio(company.lower(), spec.company.lower()) >= 75):
             spec.company = company
     role = _str(data.get("role"))
-    if role and not spec.person_name:
+    if role and not spec.person_name and (not spec.role or _refines(role, spec.role)):
         spec.role = role
     if data.get("purpose") in PURPOSE_WORDS or data.get("purpose") == "other":
         if data["purpose"] != "other" or spec.purpose == "other":
@@ -92,8 +94,23 @@ async def parse_request(text: str) -> TargetSpec:
                                       *(c for c in _strs(data.get("companies")) if _in_text(c, text, 80))])
     if isinstance(data.get("max_paths"), int):
         spec.max_paths = max(1, min(10, data["max_paths"]))
+    spec.network.companies = _not_target(spec.network.companies, spec.company)
     spec.parser = "llm"
     return spec
+
+
+def _refines(llm_role: str, rules_role: str) -> bool:
+    """'head of data' refines 'data'; 'Chief Technology Officer' does not replace 'cto'."""
+    words = set(re.findall(r"\w+", llm_role.lower()))
+    return all(w in words for w in re.findall(r"\w+", rules_role.lower()))
+
+
+def _not_target(companies: list[str], target: str | None) -> list[str]:
+    """The target's own company in the network filter would make every colleague 'in network'."""
+    if not target:
+        return companies
+    t = re.sub(r"\.[a-z]{2,4}$", "", target.lower().rstrip("/").split("/")[-1])
+    return [c for c in companies if fuzz.ratio(re.sub(r"\.[a-z]{2,4}$", "", c.lower()), t) < 85]
 
 
 def parse_rules(text: str) -> TargetSpec:
@@ -131,6 +148,7 @@ def parse_rules(text: str) -> TargetSpec:
     segment = re.sub(r"\(.*?\)", " ", segment)
     if not spec.profile_url:
         _set_role_or_name(spec, segment, had_verb=bool(verbs))
+    spec.network.companies = _not_target(spec.network.companies, spec.company)
     return spec
 
 

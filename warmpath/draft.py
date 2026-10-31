@@ -15,7 +15,7 @@ from .models import Draft, Evidence, IntroPath, Person, TargetSpec, Tie
 OUTBOX = Path("outbox")
 ASK = {"hiring": "about a role we're hiring for", "sales": "about a problem we think we can help with",
        "fundraising": "about our fundraise", "referral": "for career advice and possibly a referral",
-       "other": "for a quick conversation"}
+       "other": "to ask a few questions"}
 # capitalised words that carry no factual claim
 COMMON = set("""i i'm i'd i've i'll hi hey hello dear thanks thank cheers best regards warm warmly would could
 can will may might please totally fine no not if so and but or also just quick short note intro introduction

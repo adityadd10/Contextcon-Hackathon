@@ -9,6 +9,7 @@ strangers who happen to share a 50k-person employer.
 """
 from __future__ import annotations
 
+import math
 import re
 from datetime import date, timedelta
 
@@ -22,6 +23,21 @@ ASSUMED_TENURE = timedelta(days=365)   # past stint with no end date: assume it 
 SIZE_DISCOUNT = ((1000, 0.8), (10000, 0.55))
 SIZE_DISCOUNT_HUGE = 0.35
 TEAM_BONUS = 0.35                       # same function/title/location gives back this much of the discount
+KNEE = 70.0                             # scores are linear up to here, then compressed so strong ties stay distinct
+
+
+def calibrate(raw: float) -> float:
+    """Sum of factor points → 0-100. Linear below KNEE (thresholds keep their meaning), soft cap above it,
+    so raw 100 → 89 and raw 115 → 93 instead of both saturating at 100."""
+    raw = max(0.0, raw)
+    if raw <= KNEE:
+        return round(raw, 1)
+    return round(KNEE + (100 - KNEE) * (1 - math.exp(-(raw - KNEE) / (100 - KNEE))), 1)
+
+
+def tie_score(factors: list[Factor]) -> float:
+    """Use this after adding a factor to a tie (e.g. web proof) instead of adding points to tie.score."""
+    return calibrate(sum(f.contribution for f in factors))
 
 
 def _months(a: date, b: date) -> float:
@@ -173,7 +189,9 @@ def score_tie(a: Person, b: Person) -> Tie:
             factors.append(Factor("recency", round(years_ago, 1), round(rec, 1),
                                   "Overlap is recent (ended within 3 years)" if years_ago <= 3
                                   else f"Overlap ended {years_ago:.0f} years ago",
-                                  [_derived(f"Overlap at {main.company_name} ended {main.end.isoformat()[:7]}",
+                                  [_derived(f"Overlap at {main.company_name} " +
+                                            ("is ongoing (both still there)" if main.end >= TODAY
+                                             else f"ended {main.end.isoformat()[:7]}"),
                                             main.a_stint_ref, main.b_stint_ref)]))
         for extra in overlaps[1:]:
             factors.append(Factor("repeat_colleagues", extra.company_name, 10.0,
@@ -189,9 +207,9 @@ def score_tie(a: Person, b: Person) -> Tie:
         else:
             continue
         break
-    score = max(0.0, min(100.0, sum(fct.contribution for fct in factors)))
+    score = tie_score(factors)
     kind = "colleague" if overlaps else ("classmate" if any(f.name == "classmates" for f in factors) else "colleague")
-    return Tie(a=a, b=b, score=round(score, 1), factors=factors, overlaps=overlaps, kind=kind)
+    return Tie(a=a, b=b, score=score, factors=factors, overlaps=overlaps, kind=kind)
 
 
 def _same_school(a: str, b: str) -> bool:

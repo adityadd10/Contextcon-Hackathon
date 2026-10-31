@@ -97,3 +97,14 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
   cooldown after a total failure, `WARMPATH_LLM=0` kill switch for the "works with the LLM off" demo.
 - 11:38 · B · eval harness: co-founder recovery. Ties are broken against us; random baseline computed exactly;
   ablation without the title factor because both co-founders often have "Co-founder" titles (would flatter us).
+- 12:15 · B · did the UPDATES.md items: new verified free-model chain; 429 → next model, 403 → skip that model for
+  the process; `LLM_MAX_CALLS` (default 6) + in-memory cache, so a rerun costs no LLM calls; the target company is
+  dropped from the network filter; the LLM only fills gaps or refines the rules ("data" → "head of data" yes,
+  "cto" → a different phrasing no, a different company no). The 3 parser bugs were already fixed by the rewrite, so
+  they're now regression tests.
+- 12:15 · B · score saturation at 100: the suggested `100(1-e^(-raw/60))` would also inflate weak ties (25 → 34) and
+  silently move every MIN_TIE threshold → chose a knee: linear up to 70, soft cap above (raw 100 → 89, 115 → 93).
+  `score.tie_score(factors)` recomputes a tie after adding a factor.
+- 12:15 · B · first full offline run (fake world, LLM off): "teh data guy at swigy pls, via iitb ppl" → Priya Sharma
+  via a 2-hop path, draft fact check 10/10 sentences, 9 sources listed. Fixed: an ongoing overlap was cited as
+  "ended <this month>"; blurb wording.

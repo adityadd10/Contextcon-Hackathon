@@ -89,3 +89,34 @@ def test_empty_and_garbage_input_does_not_crash():
     for t in ("", "   ", "???", "asdf qwer"):
         s = parse_rules(t)
         assert s.raw == t
+
+
+def test_team_reported_bugs():
+    """Regressions from docs/UPDATES.md (11:45): role cut at ' of ', name-only requests, lowercase companies."""
+    s = parse_rules("warm intro to the head of data at Swiggy")
+    assert s.role == "head of data" and s.company == "Swiggy"
+    s = parse_rules("intro to Priya Sharma")
+    assert s.person_name == "Priya Sharma" and s.company is None and s.role is None
+    s = parse_rules("the data guy at swiggy pls")
+    assert s.company == "swiggy" and s.role == "data"
+
+
+def test_target_company_never_in_network(monkeypatch):
+    """UPDATES.md (11:58): the LLM put the target company into the network filter."""
+    async def fake(*_a, **_k):
+        return {"company": "Swiggy", "role": "head of data", "companies": ["Swiggy", "Flipkart"],
+                "schools": ["IIT Bombay"]}
+    monkeypatch.setattr(llm, "available", lambda: True)
+    monkeypatch.setattr(llm, "complete_json", fake)
+    s = asyncio.run(parse_request("yo can u get me to teh data guy at swiggy, thru iitb or flipkart ppl"))
+    assert s.network.companies == ["Flipkart"] and s.role == "head of data"
+    assert parse_rules("head of data at Swiggy via ex-Swiggy folks").network.companies == []
+
+
+def test_llm_only_refines_rules(monkeypatch):
+    async def fake(*_a, **_k):
+        return {"company": "Zomato", "role": "Chief Technology Officer"}
+    monkeypatch.setattr(llm, "available", lambda: True)
+    monkeypatch.setattr(llm, "complete_json", fake)
+    s = asyncio.run(parse_request("intro to the cto at zepto, maybe via zomato people"))
+    assert s.company == "zepto" and s.role == "cto"      # different company / unrelated role: rules win
