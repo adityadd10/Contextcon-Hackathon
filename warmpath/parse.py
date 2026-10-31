@@ -134,6 +134,13 @@ def parse_rules(text: str) -> TargetSpec:
     spec.purpose = _purpose(low)  # type: ignore[assignment]
     spec.network.companies = _network_companies(t)
 
+    # Hindi in Devanagari ("मुझे Swiggy के head of data से मिलवाओ"): grammar is Hindi, names and roles are Latin.
+    # Take the Latin runs: the one with a role word is the role, the first other one is the company.
+    if re.search(r"[\u0900-\u097F]", t):
+        _latin_runs(spec, t)
+        spec.network.companies = _not_target(spec.network.companies, spec.company)
+        return spec
+
     # Hinglish: "<company> mein <role> se intro karwa do"
     hm = re.search(r"\b([\w.&\-]+)\s+(?:mein|me|main|ke|ka|ki)\s+(.+?)\s+(?:se|ko|wale|waale)\b", t, re.I)
     if hm and not spec.company and re.search(r"\b(?:intro|milwa|karwa|karva|baat)\w*", low):
@@ -148,8 +155,31 @@ def parse_rules(text: str) -> TargetSpec:
     segment = re.sub(r"\(.*?\)", " ", segment)
     if not spec.profile_url:
         _set_role_or_name(spec, segment, had_verb=bool(verbs))
+    # a bare short request ("Swiggy", "razorpay.com", "Zepto CTO") is about a company
+    if not (spec.company or spec.profile_url or spec.person_name) and 1 <= len(t.split()) <= 4:
+        bare = TargetSpec(raw=text)
+        _latin_runs(bare, t)
+        if bare.company:
+            spec.company, spec.role = bare.company, bare.role or spec.role
     spec.network.companies = _not_target(spec.network.companies, spec.company)
     return spec
+
+
+def _latin_runs(spec: TargetSpec, t: str) -> None:
+    """Grammar-free fallback: role = the Latin phrase with a role word; company = the first other Latin phrase."""
+    for run in re.findall(r"[A-Za-z][\w.&'\-]*(?:\s+[A-Za-z][\w.&'\-]*)*", t):
+        words = [w for w in run.split() if w.lower() not in COMPANY_STOP | NETWORK_FILLER | {"intro", "me", "please"}]
+        if not words:
+            continue
+        first_role = next((i for i, w in enumerate(words) if ROLE_RE.fullmatch(w.strip(".,"))), None)
+        if first_role is None:
+            if not spec.company and not _is_school(" ".join(words)):
+                spec.company = " ".join(words).strip(".,")
+            continue
+        if first_role > 0 and not spec.company and not _is_school(" ".join(words[:first_role])):
+            spec.company = " ".join(words[:first_role]).strip(".,")   # "Zepto CTO"
+        if not spec.role:
+            spec.role = " ".join(ROLE_ABBR.get(w.lower(), w) for w in words[first_role:]).strip(".,")
 
 
 def _normalise(t: str) -> str:

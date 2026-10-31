@@ -148,3 +148,10 @@ Everyone appends here (newest at the bottom). Format: `HH:MM · who · tried →
   1-role "CEO" → leadership default + thin-profile penalty → real co-founder; fuzzy name matching ("Kunal" ~ "Krunal") →
   exact-phrase first + web-search-for-profile fallback. Tried: web fallback alone was ambiguous until we required the profile to
   list the company.
+- 13:55 · B · UPDATES 12:58: Devanagari Hindi ("मुझे Swiggy के head of data से मिलवाओ") now parses with the LLM off
+  (role = the Latin phrase with a role word, company = the first other one); a bare 1-4 word request ("Swiggy",
+  "Zepto CTO") sets the company; `thin_profile` factor (-8 per person with 1 role and no education, cited) so a thin
+  record never wins on its own. Eval unchanged. Hindi request runs end to end in the fake world.
+- 13:55 · B · ⚠ for Aditya: fake mode shares `.cache/crust` with live runs. After a live "Swiggy" lookup, a fake run
+  gets the real id 5702 and finds nobody. Record fake-mode demos with `WARMPATH_CACHE=0` or a separate
+  `WARMPATH_CACHE_DIR` (better: key the cache by mode in crust.py).

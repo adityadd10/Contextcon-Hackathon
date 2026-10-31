@@ -161,7 +161,7 @@ uv run --with pytest pytest -q tests          # whole suite runs offline, no API
 uv run python -m eval.cofounder_eval          # live co-founder eval (~4-6 credits per startup)
 uv run python -m eval.cofounder_eval --offline   # re-score saved data, 0 credits
 ```
-- **Messy-input suite** ([tests/test_parse.py](tests/test_parse.py)): 16 real-world requests, including typos ("teh data
+- **Messy-input suite** ([tests/test_parse.py](tests/test_parse.py)): 21 real-world requests, including Hindi in Devanagari, typos ("teh data
   guy at swiggy pls"), text-speak, Hinglish, profile/company URLs, domains, all-caps, a name with no company, and
   network hints. Plus: the LLM can't invent a name, and LLM-down falls back to rules.
 - **Tie model** ([tests/test_score.py](tests/test_score.py)): the hardest case (small team beats a big-company

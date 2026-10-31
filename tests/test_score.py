@@ -169,3 +169,16 @@ def test_self_employed_is_not_a_shared_workplace():
     a, b = to_person(raw(1, "Self-employed"), "x"), to_person(raw(2, "Self-employed"), "x")
     assert a.stints == [] and score_tie(a, b).score == 0
     assert to_person(raw(3, "Freelance"), "x").stints == [] and to_person(raw(4, "Acme"), "x").stints
+
+
+def test_thin_profile_never_wins_on_its_own():
+    """UPDATES 12:58: a 1-role, no-education record shouldn't beat an equally placed full profile."""
+    from warmpath.models import School
+    t = P(1, "Target T", S(10, "TinyCo", (2019, 1, 1), (2022, 1, 1), hc=40), S(11, "Old", (2015, 1, 1), (2018, 1, 1)))
+    thin = P(2, "Thin X", S(10, "TinyCo", (2019, 1, 1), (2022, 1, 1), hc=40))
+    full = P(3, "Full Y", S(10, "TinyCo", (2019, 1, 1), (2022, 1, 1), hc=40), S(12, "Else", (2016, 1, 1), (2018, 1, 1)),
+             schools=[School("Some College", ref="y#s0")])
+    tt, tf = score_tie(thin, t), score_tie(full, t)
+    assert tf.score > tt.score
+    f = next(f for f in tt.factors if f.name == "thin_profile")
+    assert f.contribution < 0 and f.evidence and "Thin X" in f.explanation

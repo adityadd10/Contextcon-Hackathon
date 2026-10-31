@@ -43,6 +43,13 @@ CASES = [
      {"company": "phonepe", "role": "cfo"}),
     ("can sum1 intro me 2 da founder of zepto plz, via iit-b ppl",
      {"company": "zepto", "role": "founder", "schools": ["IIT Bombay"]}),
+    ("मुझे Swiggy के head of data से मिलवाओ",
+     {"company": "swiggy", "role": "head of data"}),
+    ("मुझे IITB वालों के through Zomato के CTO से intro चाहिए",
+     {"company": "zomato", "role": "cto", "schools": ["IIT Bombay"]}),
+    ("Swiggy", {"company": "swiggy", "role": None, "person_name": None}),
+    ("Zepto CTO", {"company": "zepto", "role": "cto"}),
+    ("Urban Company", {"company": "urban company"}),
     ("intro to Aditya at Razorpay, he was at IIT Delhi",
      {"company": "razorpay", "person_name": "aditya", "schools": ["IIT Delhi"]}),
 ]

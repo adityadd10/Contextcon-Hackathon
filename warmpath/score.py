@@ -24,6 +24,7 @@ ASSUMED_TENURE = timedelta(days=365)   # past stint with no end date: assume it 
 SIZE_DISCOUNT = ((1000, 0.8), (10000, 0.55))
 SIZE_DISCOUNT_HUGE = 0.35
 TEAM_BONUS = 0.35                       # same function/title/location gives back this much of the discount
+THIN_PENALTY = 8.0                      # per person with a 1-role, no-education record
 KNEE = 70.0                             # scores are linear up to here, then compressed so strong ties stay distinct
 
 
@@ -237,6 +238,13 @@ def score_tie(a: Person, b: Person) -> Tie:
         else:
             continue
         break
+    thin = [p for p in (a, b) if len(p.stints) <= 1 and not p.schools]
+    if factors and thin:   # a 1-role, no-education record is often partial or a junk profile
+        who = " and ".join(p.name for p in thin)
+        factors.append(Factor("thin_profile", len(thin), -THIN_PENALTY * len(thin),
+                              f"{who}: only one role and no education on record, so this tie is less certain",
+                              [_derived(f"{p.name}: {len(p.stints)} role(s), 0 schools on record",
+                                        *(s.ref for s in p.stints)) for p in thin]))
     score = tie_score(factors)
     kind = "colleague" if overlaps else ("classmate" if any(f.name == "classmates" for f in factors) else "colleague")
     return Tie(a=a, b=b, score=score, factors=factors, overlaps=overlaps, kind=kind)
