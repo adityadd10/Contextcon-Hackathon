@@ -97,7 +97,7 @@ async def parse_request(text: str) -> TargetSpec:
     spec.network.schools = _dedupe([*spec.network.schools, *_strs(data.get("schools"))])
     spec.network.companies = _dedupe([*spec.network.companies,
                                       *(c for c in _strs(data.get("companies")) if _in_text(c, text, 80))])
-    if isinstance(data.get("max_paths"), int):
+    if isinstance(data.get("max_paths"), int) and not isinstance(data.get("max_paths"), bool):
         spec.max_paths = max(1, min(10, data["max_paths"]))
     spec.network.companies = _not_target(spec.network.companies, spec.company)
     spec.parser = "llm"

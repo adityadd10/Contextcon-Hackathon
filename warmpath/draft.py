@@ -148,11 +148,12 @@ async def draft_intro(path: IntroPath, spec: TargetSpec) -> Draft:
             f"Connector: {d.to}\nTarget: {path.nodes[-1].name} ({path.nodes[-1].current_title or 'role unknown'})\n"
             f"Purpose: {spec.purpose}\nFacts:\n{facts}\n\n"
             f"Rewrite this draft, under 120 words, keep the same meaning:\n{d.body}", max_tokens=400)
-        if txt:
-            txt = re.sub(r"(?im)^\s*subject:.*$", "", txt).strip()
+        if isinstance(txt, str) and txt.strip():
+            txt = re.sub(r"(?im)^\s*subject:.*$", "", txt)
+            txt = re.sub(r"(?m)^\s*```\w*\s*$", "", txt).strip()     # markdown fences
             bad = check_claims(txt, path)
-            if bad or len(txt.split()) > 180:
-                d.llm_rejected = bad or ["too long"]
+            if bad or len(txt.split()) > 180 or len(txt.split()) < 8:
+                d.llm_rejected = bad or ["too long" if len(txt.split()) > 180 else "empty or too short"]
             else:
                 d.body = txt
                 _verify(d, path)
