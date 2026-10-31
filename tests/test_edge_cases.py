@@ -103,3 +103,10 @@ def test_privacy_mode_masks_strangers_but_keeps_target(monkeypatch):
     assert r.paths and "Rahul Verma" not in shown and "Rahul" not in shown   # connector masked everywhere
     assert "Priya Sharma" in shown                                           # the requested target stays readable
     assert r.paths[0].nodes[0].name == "Rahul Verma"                         # the real run is untouched
+
+
+def test_demo_mode_explains_missing_real_company(monkeypatch):
+    monkeypatch.setenv("WARMPATH_FAKE", "1")
+    r, ev = asyncio.run(_run("warm intro to whoever runs data at Facebook, ideally via IITB folks", GraphStore("g.db")))
+    assert r.target is None
+    assert any("offline DEMO data" in e.get("message", "") for e in ev)

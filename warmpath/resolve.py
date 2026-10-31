@@ -1,6 +1,7 @@
 """Resolve the target company + person from a TargetSpec.  Owner: Member A."""
 from __future__ import annotations
 
+import os
 import re
 from datetime import date
 
@@ -66,7 +67,11 @@ async def resolve_company(c: Crust, query: str, emit: Emit) -> Company | None:
             if url:
                 matches += await attempt(url, profile_urls=[url])
     if not matches:
-        ev.warn(emit, f"No company in Crustdata matches '{q}' (tried: {'; '.join(tried)})")
+        if os.getenv("WARMPATH_FAKE") == "1":  # the offline world only has a handful of companies
+            ev.warn(emit, f"'{q}' isn't in the offline DEMO data (it only has Swiggy, Tiny Analytics, Flipkart and SeedCo). "
+                          f"For real companies, restart the server without WARMPATH_FAKE=1 (needs CRUSTDATA_API_KEY in .env).")
+        else:
+            ev.warn(emit, f"No company in Crustdata matches '{q}' (tried: {'; '.join(tried)})")
         return None
     seen, cands = set(), []
     for m in matches:
